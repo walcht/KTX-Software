@@ -53,7 +53,7 @@ struct bcn_compression_workload {
     uint32_t height;
     uint32_t nchannels;
     ktxBCnParams params;
-    const uint8_t* data_in;
+    const void* data_in;  /* uint8_t* for LDR or uint16_t* for HDR */
     uint8_t* data_out;
 };
 
@@ -250,18 +250,19 @@ insert_block(T* dst, const T* src, uint32_t x, uint32_t y, uint32_t width, uint3
     return nbr_written_bytes;
 }
 
+template<typename T>
 inline void
-extract_rgb_from_rgba_block(uint8_t* rgb, const uint8_t* rgba) {
+extract_rgb_from_rgba_block(T* rgb, const T* rgba) {
     const uint32_t src_pitch = 4 * 4;
     const uint32_t dst_pitch = 4 * 3;
     [[maybe_unused]] uint32_t nbr_written_bytes_total = 0;
     for (uint32_t py = 0; py < 4; ++py) {
         for (uint32_t px = 0; px < 4; ++px) {
-            memcpy(rgb + px * 3 + py * dst_pitch, rgba + px * 4 + py * src_pitch, 3);
-            nbr_written_bytes_total += 3;
+            memcpy(rgb + px * 3 + py * dst_pitch, rgba + px * 4 + py * src_pitch, 3 * sizeof(T));
+            nbr_written_bytes_total += 3 * sizeof(T);
         }
     }
-    assert(nbr_written_bytes_total == (4 * 4 * 3));
+    assert(nbr_written_bytes_total == 4 * 4 * 3 * sizeof(T));
 }
 
 inline void
@@ -277,7 +278,7 @@ rgb_to_rgba_block(uint8_t* rgba, const uint8_t* rgb, uint8_t alpha = 255) {
             nbr_written_bytes_total += 4;
         }
     }
-    assert(nbr_written_bytes_total == (4 * 4 * 4));
+    assert(nbr_written_bytes_total == 4 * 4 * 4);
 }
 
 inline ktx_bcn_compression_e

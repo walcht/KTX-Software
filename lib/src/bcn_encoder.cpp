@@ -408,6 +408,7 @@ compression_workload_runner(int thread_count, int thread_id, void* payload) {
     uint8_t rgba[4 * 4 * 4];  /* 4 x 4 x 4 */
     uint8_t rgb[4 * 4 * 3];   /* only for BC1 */
     uint16_t rgbh[4 * 4 * 3]; /* 4 x 4 x 3 x 2 - for BC6H? */
+    uint16_t rgbah[4 * 4 * 4]; /* 4 x 4 x 4 x 2 - for BC6H? with Alpha input */
     uint8_t rgbx[4 * 4 * 4];  /* only for BC1 */
 
     basist::color_rgba rgba_bc7[16];
@@ -424,14 +425,22 @@ compression_workload_runner(int thread_count, int thread_id, void* payload) {
         // via clamping to edge).
         if (workload->params.bcn == KTX_BCN_COMPRESSION_BC6HU ||
             workload->params.bcn == KTX_BCN_COMPRESSION_BC6HS) {
-            extract_block(rgbh, reinterpret_cast<const uint16_t*>(workload->data_in), xBlock * 4,
-                          yBlock * 4, width, height, nchannels);
+            // If input is RGBA 16, then we need to extract the RGB block (drop alpha)
+            // before passing the block pixels to the bc6hu encoder which expects RGB 16
+            if (nchannels == 4) {
+                extract_block(rgbah, static_cast<const uint16_t*>(workload->data_in), xBlock * 4,
+                              yBlock * 4, width, height, 4);
+                extract_rgb_from_rgba_block(rgbh, rgbah);
+            } else {
+                extract_block(rgbh, static_cast<const uint16_t*>(workload->data_in), xBlock * 4,
+                              yBlock * 4, width, height, nchannels /* 3 */);
+            }
         } else if (workload->params.bcn == KTX_BCN_COMPRESSION_BC1) {
             // BC1 is an edge case because encoder expects 4 while input is 3
-            extract_block(rgb, workload->data_in, xBlock * 4, yBlock * 4, width, height, nchannels);
+            extract_block(rgb, static_cast<const uint8_t*>(workload->data_in), xBlock * 4, yBlock * 4, width, height, nchannels);
             rgb_to_rgba_block(rgbx, rgb);
         } else {
-            extract_block(rgba, workload->data_in, xBlock * 4, yBlock * 4, width, height,
+            extract_block(rgba, static_cast<const uint8_t*>(workload->data_in), xBlock * 4, yBlock * 4, width, height,
                           nchannels);
         }
 
@@ -476,9 +485,8 @@ compression_workload_runner(int thread_count, int thread_id, void* payload) {
 
         case KTX_BCN_COMPRESSION_BC7:
             // BC7: 4 x 4 x 4 = 64 bytes -> 16 bytes
-            // TODO: is this needed? libktx is compiled with strict aliasing while basisu is
+            // This is probably not needed because libktx is compiled with strict aliasing while basisu is
             // compiled with '-fno-strict-aliasing'. basist::color_rgba is a trivial type after all
-            // ...
             memcpy(rgba_bc7, rgba, sizeof(rgba_bc7));
             basist::bc7f::fast_pack_bc7_auto_rgba(
                 pDstLevelImage + (yBlock * num_blocks_x + xBlock) * BC7_BLOCK_SIZE, rgba_bc7,
@@ -1387,22 +1395,22 @@ postprocess_rdo_bcn(const uint8_t* unpacked_img, size_t unpacked_img_size, uint8
  * @memberof ktxTexture2
  * @ingroup writer
  * @~English
- * @brief Compress a ktx texture with uncompressed images to specified BCn
- *        format. Currently, only BC1, BC3, BC4, BC5, BC6HU*, and BC7 target
- *        formats are supported. Punch-through alpha for BC1 is not supported.
+ * @brief Compress an uncompressed ktx texture to specified BCn format.
  *
- *        The images are encoded to specified BCn block-compressed format. The
- *        encoded images replace the original images and the texture's fields
- *        including the DFD are modified to reflect the new state.
+ * Currently, only BC1, BC3, BC4, BC5, BC6HU, and BC7 target formats are
+ * supported. Punch-through alpha for BC1 is not supported.
  *
- *        Such textures can be directly uploaded to a BCn-supporting GPU via
- *        a graphics API.
+ * The images are encoded to specified BCn block-compressed format. The encoded
+ * images replace the original images and the texture's fields including the DFD
+ * are modified to reflect the new state.
  *
- *        Encoding non-multiple-of-4 texture dimensions is supported. Block
- *        pixels/texels that are out of the texture's dimensions are
- *        simply filled via a clamp-to-edge strategy. This strategy is easier
- *        for the encoder to handle since no abrupt changes are introduced in
- *        image boundaries.
+ * Such textures can be directly uploaded to a BCn-supporting GPU via a graphics
+ * API.
+ *
+ * Encoding non-multiple-of-4 texture dimensions is supported. Block
+ * pixels/texels that are out of the texture's dimensions are simply filled via
+ * a clamp-to-edge strategy. This strategy is easier for the encoder to handle
+ * since no abrupt changes are introduced in image boundaries.
  *
  * @param [in] This     pointer to the ktxTexture2 object of interest.
  * @param [in] params   pointer to BCn parameters object. These
@@ -1569,11 +1577,16 @@ ktxTexture2_CompressBCnEx(ktxTexture2* This, ktxBCnParams* params) {
         switch (This->vkFormat) {
         case VK_FORMAT_R16G16B16_SFLOAT:
             compressedVkFormat = VK_FORMAT_BC6H_UFLOAT_BLOCK;
+            nchannels = BC6H_NCHANNELS;
+            break;
+            /* Also accept RGBA 16 input and drop the alpha channel when encoding */
+        case VK_FORMAT_R16G16B16A16_SFLOAT:
+            compressedVkFormat = VK_FORMAT_BC6H_UFLOAT_BLOCK;
+            nchannels = 4;
             break;
         default:
             return KTX_INVALID_OPERATION;  // Not a valid decompressed vkformat for BC6H
         }
-        nchannels = BC6H_NCHANNELS;
         blocksize_in_bytes = BC6H_BLOCK_SIZE;
         expected_color_model = khr_df_model_e::KHR_DF_MODEL_BC6H;
         basist::basisu_transcoder_init();
@@ -1821,10 +1834,5 @@ extern "C" KTX_error_code
 ktxTexture2_CompressBCnEx(ktxTexture2*, ktxBCnParams*) {
     return KTX_INVALID_OPERATION;
 }
-
-// extern "C" KTX_error_code
-// ktxTexture2_CompressBCn(ktxTexture2*, ktx_uint32_t) {
-//     return KTX_INVALID_OPERATION;
-// }
 
 #endif  // KTX_FEATURE_WRITE

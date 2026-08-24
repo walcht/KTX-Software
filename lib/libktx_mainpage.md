@@ -420,7 +420,8 @@ result = ktxTexture2_CompressAstc(texture, quality);
 ## Writing a BCn-Compressed Texture
 
 The following example showcases how to use libktx to generate a BCn-compressed
-(i.e., BC1, BC3, BC4, BC5, BC6HU, BC6HS, or BC7) texture.
+(i.e., BC1, BC3, BC4, BC5, BC6HU, BC6HS, or BC7) texture using
+ktxTexture2::ktxTexture2\_CompressBCnEx.
 
 You can also use Basis Universal's transcode utilities to transcode UASTC (or
 other supported codecs) to BCn but the difference here is that this directly
@@ -500,6 +501,7 @@ params.structSize = sizeof(params);
 params.bcn = KTX_BCN_COMPRESSION_BC7;
 params.bcnCompressionQuality = KTX_PACK_BCN_QUALITY_LEVEL_MEDIUM;
 
+// See ktxTexture2::ktxTexture2_CompressBCnEx
 result = ktxTexture2_CompressBCnEx(texture, &params);
 if (result != KTX_SUCCESS) {
     // error handling ...

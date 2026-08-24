@@ -504,14 +504,14 @@ int main(int argc, char* argv[]) {
     // all sort of issues (e.g., bad_alloc if a directory is supplied)
     if ((fs::status(lhs_path)).type() != fs::file_type::regular) {
         fmt::println(stderr,
-                     "Profided expected-ktx2 filepath \"{}\" either does not exist or is not a "
+                     "Provided expected-ktx2 filepath \"{}\" either does not exist or is not a "
                      "regular file.",
                      lhs_path);
         std::exit(3);
     }
     if ((fs::status(rhs_path)).type() != fs::file_type::regular) {
         fmt::println(stderr,
-                     "Profided received-ktx2 filepath \"{}\" either does not exist or is not a "
+                     "Provided received-ktx2 filepath \"{}\" either does not exist or is not a "
                      "regular file.",
                      lhs_path);
         std::exit(3);
