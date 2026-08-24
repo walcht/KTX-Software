@@ -3597,10 +3597,17 @@ class ktxTexture2BCnEncodeDecodeTestBase
         FileRAII ktxdiffOut = tmpDir / format("ktxdiff_{}_vs_{}.txt", original.path().stem().string(),
                                               decoded.path().stem().string());
 
+        // BC6HU encoder cleans up the SFLOAT16 input by 0'ing negative values
+        // We must instruct ktxdiff to ignore comparisons between any negative values (negative vs. 0)
+        // otherwise ktxdiff will fail regardless of the set tolerance
+        std::string extraKtxdiffArgs;
+        if (bcn == KTX_BCN_COMPRESSION_BC6HU)
+            extraKtxdiffArgs += " --ignore-signed";
+
         // Compare orginal vs. decoded texture with 0.08 tolerance
         std::string command =
-            format("{} {} {} 0.08 --skip-kvd > {}", ktxdiffPath.string(), original.path().string(),
-                   decoded.path().string(), ktxdiffOut.path().string());
+            format("{} {} {} 0.08 --skip-kvd{} > {}", ktxdiffPath.string(), original.path().string(),
+                   decoded.path().string(), extraKtxdiffArgs, ktxdiffOut.path().string());
         int status = std::system(command.c_str());
         EXPECT_EQ(status, 0)
             << format("std::system() with command \"{}\" returned error code: {}", command, status);

@@ -211,7 +211,7 @@ CompareResult compareSFloat32(const char* rawLhs, const char* rawRhs, std::size_
 
     for (std::size_t i = 0; i < count; ++i) {
         const auto diff = std::abs(lhs[i] - rhs[i]);
-        const auto absMin = std::min(std::abs(lhs[1]), std::abs(rhs[1]));
+        const auto absMin = std::min(std::abs(lhs[i]), std::abs(rhs[i]));
         if (diff > tolerance * absMin)
             return CompareResult{false, diff, i, i * element_size, lhs[i], rhs[i]};
     }
@@ -219,7 +219,7 @@ CompareResult compareSFloat32(const char* rawLhs, const char* rawRhs, std::size_
     return CompareResult{};
 }
 
-CompareResult compareSFloat16(const char* rawLhs, const char* rawRhs, std::size_t rawSize, float tolerance) {
+CompareResult compareSFloat16(const char* rawLhs, const char* rawRhs, std::size_t rawSize, float tolerance, bool ignore_signed = false) {
     const auto* lhs = reinterpret_cast<const uint16_t*>(rawLhs);
     const auto* rhs = reinterpret_cast<const uint16_t*>(rawRhs);
     const auto element_size = sizeof(uint16_t);
@@ -229,6 +229,8 @@ CompareResult compareSFloat16(const char* rawLhs, const char* rawRhs, std::size_
     for (std::size_t i = 0; i < count; ++i) {
         const auto lhsFloat = imageio::half_to_float(lhs[i]);
         const auto rhsFloat = imageio::half_to_float(rhs[i]);
+        if (ignore_signed && (lhsFloat < 0 || rhsFloat < 0))
+            continue;
         const auto diff = std::abs(lhsFloat - rhsFloat);
         const auto absMin = std::min(std::abs(lhsFloat), std::abs(rhsFloat));
         // Some encoders don't encode 0 values as 0 but rather as a very small number (e.g., BC6HU encodes 0 into circa 1e-06).
@@ -314,7 +316,7 @@ CompareResult compareAstc(const char* lhs, const char* rhs, std::size_t size, ui
     }
 }
 
-bool compare(Texture& lhs, Texture& rhs, float tolerance, bool skip_kvd) {
+bool compare(Texture& lhs, Texture& rhs, float tolerance, bool skip_kvd, bool ignore_signed) {
     const auto vkFormat = static_cast<VkFormat>(lhs.header.vkFormat);
     const auto* bdfd = reinterpret_cast<const uint32_t*>(lhs.dfdData) + 1;
     const auto componentCount = KHR_DFDSAMPLECOUNT(bdfd);
@@ -409,7 +411,7 @@ bool compare(Texture& lhs, Texture& rhs, float tolerance, bool skip_kvd) {
                     if ((lhs.transcoded && !isFloat) || isFormatUNORM8) {
                         result = compareUnorm8(imageDataLhs, imageDataRhs, imageSize, tolerance);
                     } else if ((lhs.transcoded && isFloat) || isFormatSFloat16) {
-                        result = compareSFloat16(imageDataLhs, imageDataRhs, imageSize, tolerance);
+                        result = compareSFloat16(imageDataLhs, imageDataRhs, imageSize, tolerance, ignore_signed);
                     } else if (isFormatUNORM16) {
                         result = compareUnorm16(imageDataLhs, imageDataRhs, imageSize, tolerance);
                     } else if (isFormatAstc) {
@@ -450,16 +452,20 @@ int main(int argc, char* argv[]) {
 
     float tolerance = 0.05f;
     bool skip_kvd = false;
+    bool ignore_signed = false;
 
     cxxopts::Options opts("ktxdiff", "diff two KTX2 files");
     opts.add_options()("expected-ktx2", "Expected KTX2 file", cxxopts::value<std::string>())(
         "received-ktx2", "Received KTX2 file", cxxopts::value<std::string>())(
-        "tolerance",
+        "tolerance,t",
         "For normalized formats tolerance is the normalized absolute value of the acceptable "
         "difference (inclusive). For unnormalized formats it is the fraction of the minimum of the "
         "values being compared that is acceptable. Default is 0.05",
         cxxopts::value<float>())("skip-kvd", "Ignore key-value metadata (KVD)")(
-        "help,h", "Show this help message and exit");
+        "ignore-signed,i",
+        "Ignore signed values when comparing. This is especially useful for BC6HU encoders since "
+        "these may cleanup the input by replacing negative values by 0. This currently only "
+        "applies to SFLOAT16 comparisons.")("help,h", "Show this help message and exit");
     opts.parse_positional({"expected-ktx2", "received-ktx2", "tolerance"});
     opts.positional_help("<expected-ktx2> <received-ktx2> [tolerance]");
     opts.show_positional_help();
@@ -487,6 +493,7 @@ int main(int argc, char* argv[]) {
     // Parse options
     if (result.count("tolerance")) tolerance = result["tolerance"].as<float>();
     if (result.count("skip-kvd")) skip_kvd = true;
+    if (result.count("ignore-signed")) ignore_signed = true;
 
     InitUTF8CLI(argc, argv);
 
@@ -496,23 +503,23 @@ int main(int argc, char* argv[]) {
     // Make sure provided paths are paths to regular files (i.e., not directories) otherwise we get
     // all sort of issues (e.g., bad_alloc if a directory is supplied)
     if ((fs::status(lhs_path)).type() != fs::file_type::regular) {
-        fmt::println(
-            stderr,
-            "Profided expected-ktx2 filepath \"{}\" either does not exist or is not a regular file.",
-            lhs_path);
+        fmt::println(stderr,
+                     "Profided expected-ktx2 filepath \"{}\" either does not exist or is not a "
+                     "regular file.",
+                     lhs_path);
         std::exit(3);
     }
     if ((fs::status(rhs_path)).type() != fs::file_type::regular) {
-        fmt::println(
-            stderr,
-            "Profided received-ktx2 filepath \"{}\" either does not exist or is not a regular file.",
-            lhs_path);
+        fmt::println(stderr,
+                     "Profided received-ktx2 filepath \"{}\" either does not exist or is not a "
+                     "regular file.",
+                     lhs_path);
         std::exit(3);
     }
 
     Texture lhs(lhs_path);
     Texture rhs(rhs_path);
-    const auto match = compare(lhs, rhs, tolerance, skip_kvd);
+    const auto match = compare(lhs, rhs, tolerance, skip_kvd, ignore_signed);
 
     return match ? 0 : 1;
 }
