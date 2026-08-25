@@ -11,18 +11,18 @@
  * @file
  * @~English
  *
- * @brief Functions for encoding an uncompressed texture to a BCn format with an
- *        optional RDO post-processing step to significantly (circa 50% or more)
- *        reduce bit rate when supercompressed with Deflate (Zlib or ZSTD).
- *        Currently supported BCn formats are: BC1, BC3, BC4, BC5, BC6HU*, and
- *        BC7.
+ * @brief Functions for encoding an uncompressed texture to a BCn format.
  *
- *        *: support for BC6HS is not yet implemented because basisu's encoder
- *        currently fails when given signed half float values.
+ * An optional RDO post-processing step can be enabled to significantly (circa
+ * 50% or more) reduce bit rate when supercompressed with Deflate (Zlib or
+ * ZSTD). Currently supported BCn formats are: BC1, BC3, BC4, BC5, BC6HU*, and
+ * BC7.
  *
- *        BC2 (RGB+A) encoder is not implemented because it's rarely used in
- *        practice due to poor quality alpha encoding. BC3 is almost always used
- *        instead.
+ * *: support for BC6HS is not yet implemented because basisu's encoder
+ * currently fails when given signed half float values.
+ *
+ * BC2 (RGB+A) encoder is not implemented because it's rarely used in practice
+ * due to poor quality alpha encoding. BC3 is almost always used instead.
  *
  * @author Walid Chtioui, independent contributor (walid.chtioui.main@gmail.com)
  */
@@ -910,9 +910,9 @@ struct clean_hdr_results {
  * @private
  * @brief Clean up HDR input for basisu's BC6HU encoder.
  *
- *        Based on basisu's basis_compressor::clean_hdr_image. It sets NaN,
- *        infinite and negative values to 0 and scales input values that are
- *        greater than basist::ASTC_HDR_MAX_VAL.
+ * Based on basisu's basis_compressor::clean_hdr_image. It sets NaN, infinite
+ * and negative values to 0 and scales input values that are greater than
+ * basist::ASTC_HDR_MAX_VAL.
  *
  * @param [in,out] src_rgb16        pointer to the source 16-bit unpacked data.
  * @param [in] width                image width (in texels).
@@ -922,19 +922,19 @@ struct clean_hdr_results {
  *              encountered and set to 0 and whether scaling has been applied.
  */
 static clean_hdr_results
-clean_hdr_image(ktx_uint8_t* src_rgb16, uint32_t width, uint32_t height) {
+clean_hdr_image(uint16_t* src_rgb16, uint32_t width, uint32_t height, uint32_t stride) {
+    assert(stride == 3 || stride == 4);  /* only RGB[A] */
     clean_hdr_results res;
     res.hdr_image_scale = 1.0;
-    auto p_src = reinterpret_cast<uint16_t*>(src_rgb16);
+    auto p_src = src_rgb16;
 
     // Find max used value
     float max_used_val = 0.0f;
     for (uint32_t y = 0; y < height; y++) {
         for (uint32_t x = 0; x < width; x++) {
             for (uint32_t i = 0; i < 3; i++) {
-                uint16_t& c = p_src[(x + y * width) * 3 + i];
+                uint16_t& c = p_src[(x + y * width) * stride + i];
                 float val = basist::half_to_float(c);
-
                 if (std::isnan(val) || std::isinf(val) || basist::half_is_signed(c)) {
                     if (std::isnan(val)) res.one_or_more_nan_values = true;
                     if (std::isinf(val)) res.one_or_more_inf_values = true;
@@ -942,11 +942,10 @@ clean_hdr_image(ktx_uint8_t* src_rgb16, uint32_t width, uint32_t height) {
                     c = 0;
                     val = 0.0f;
                 }
-
                 max_used_val = std::max<float>(max_used_val, val);
-            }
-        }
-    }
+            }  // i
+        }  // width
+    }  // height
 
     // If the max value can't be encoded safely to ASTC HDR, we'll have to
     // rescale the source image.
@@ -956,13 +955,13 @@ clean_hdr_image(ktx_uint8_t* src_rgb16, uint32_t width, uint32_t height) {
         for (uint32_t y = 0; y < height; y++) {
             for (uint32_t x = 0; x < width; x++) {
                 for (uint32_t i = 0; i < 3; i++) {
-                    uint16_t& c = p_src[(x + y * width) * 3 + i];
+                    uint16_t& c = p_src[(x + y * width) * stride + i];
                     auto pre_scaled_val = basist::half_to_float(c);
                     c = basist::float_to_half((float)std::min<double>(
                         pre_scaled_val * inv_hdr_image_scale, basist::ASTC_HDR_MAX_VAL));
-                }
-            }
-        }
+                }  // i
+            }  // width
+        }  // height
     }
 
     return res;
@@ -1707,7 +1706,7 @@ ktxTexture2_CompressBCnEx(ktxTexture2* This, ktxBCnParams* params) {
                 // TODO: Basisu's outputs warning if HDR pixels are cleaned up.
                 // Should we also do that in here?
                 [[maybe_unused]] auto hdr_cleanup_res =
-                    clean_hdr_image(pSrcLevelImage, width, height);
+                    clean_hdr_image(reinterpret_cast<uint16_t*>(pSrcLevelImage), width, height, nchannels);
 #if DEBUG_PRINT_STATS
                 if (hdr_cleanup_res.one_or_more_nan_values && !hdr_one_or_more_nan_values_msg) {
                     std::cout << "One or more input pixels was NaN, setting to 0." << '\n';
