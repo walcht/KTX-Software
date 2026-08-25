@@ -4,6 +4,7 @@
 
 #include "ktx.h"
 #include "ktxint.h"
+#include "transcoder/basisu_transcoder_internal.h"
 #include "vkformat_enum.h"
 #include "platform_utils.h"
 #include "imageio_utility.h"
@@ -219,7 +220,29 @@ CompareResult compareSFloat32(const char* rawLhs, const char* rawRhs, std::size_
     return CompareResult{};
 }
 
-CompareResult compareSFloat16(const char* rawLhs, const char* rawRhs, std::size_t rawSize, float tolerance, bool ignore_signed = false) {
+/**
+ * @internal
+ * @English
+ * @brief Compare two half float (F16) data arrays.
+ *
+ * If an nan value is encountered in any of the two inputs the comparison for
+ * that index is ignored. 
+ *
+ * If an inf value is encountered in any of the two inputs the comparison for
+ * that index is ignored.
+ *
+ * nan and inf values are ignored because HDR usually encoders do not even
+ * accept nan/inf inputs and pre-processing has to clean them up (e.g., by
+ * assigning nan/(+-)inf to 0 as is done in the case of BC6HU encoder).
+ *
+ * Some nan/inf arithmetic rules:
+ *   INF - INF = NaN
+ *   (+/-)INF / (+/-)INF = NaN
+ *   (+/-)INF * 0 = NaN
+ *   NaN (any OP) any-value = NaN
+ */
+CompareResult compareSFloat16(const char* rawLhs, const char* rawRhs, std::size_t rawSize,
+                              float tolerance, bool ignore_signed = false) {
     const auto* lhs = reinterpret_cast<const uint16_t*>(rawLhs);
     const auto* rhs = reinterpret_cast<const uint16_t*>(rawRhs);
     const auto element_size = sizeof(uint16_t);
@@ -227,9 +250,14 @@ CompareResult compareSFloat16(const char* rawLhs, const char* rawRhs, std::size_
     const auto baseline = (std::numeric_limits<float>::epsilon() * 100000) * tolerance;
 
     for (std::size_t i = 0; i < count; ++i) {
-        const auto lhsFloat = imageio::half_to_float(lhs[i]);
-        const auto rhsFloat = imageio::half_to_float(rhs[i]);
+        // TODO: make sure to revert this or replace imageio's half_to_float with Basis Universal's version
+        const auto lhsFloat = basist::half_to_float(lhs[i]);
+        const auto rhsFloat = basist::half_to_float(rhs[i]);
         if (ignore_signed && (lhsFloat < 0 || rhsFloat < 0))
+            continue;
+        if (std::isnan(lhsFloat) || std::isnan(rhsFloat))
+            continue;
+        if (std::isinf(lhsFloat) || std::isinf(rhsFloat))
             continue;
         const auto diff = std::abs(lhsFloat - rhsFloat);
         const auto absMin = std::min(std::abs(lhsFloat), std::abs(rhsFloat));
