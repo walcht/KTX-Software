@@ -1726,11 +1726,9 @@ void CommandCreate::executeCreate() {
                 }
 
                 if (options.encodeBCn) {
-                  auto decompressed_format = decompressedBCnFormat(options.vkFormat);
-                  if (decompressed_format == VK_FORMAT_UNDEFINED) {
-                    fatal(rc::INVALID_FILE, "Failed to get decompressed BCn format from: {}", toString(options.vkFormat));
-                  }
-                  options.vkFormat = decompressed_format;
+                  // No need to check output of decompressedBCnFormat because encodeBCn is set to true only if provided
+                  // format is BCn
+                  options.vkFormat = decompressedBCnFormat(options.vkFormat);
                 }
 
                 firstImageSpec = inputImageFile->spec();
@@ -3213,14 +3211,12 @@ VkFormat CommandCreate::decompressedBCnFormat(VkFormat format) const {
     case VK_FORMAT_BC1_RGB_SRGB_BLOCK:
       return VK_FORMAT_R8G8B8_SRGB;
 
-#if 0
+    case VK_FORMAT_BC1_RGBA_UNORM_BLOCK: [[fallthrough]];
     case VK_FORMAT_BC2_UNORM_BLOCK: [[fallthrough]];
-    case VK_FORMAT_BC2_SRGB_BLOCK:
-      return VK_FORMAT_UNDEFINED;
-#endif
-
     case VK_FORMAT_BC3_UNORM_BLOCK:
       return VK_FORMAT_R8G8B8A8_UNORM;
+    case VK_FORMAT_BC1_RGBA_SRGB_BLOCK: [[fallthrough]];
+    case VK_FORMAT_BC2_SRGB_BLOCK: [[fallthrough]];
     case VK_FORMAT_BC3_SRGB_BLOCK:
       return VK_FORMAT_R8G8B8A8_SRGB;
 

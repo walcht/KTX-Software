@@ -907,7 +907,7 @@ struct clean_hdr_results {
 
 /*
  * @~English
- * @private
+ * @internal
  * @brief Clean up HDR input for basisu's BC6HU encoder.
  *
  * Based on basisu's basis_compressor::clean_hdr_image. It sets NaN, infinite
@@ -973,7 +973,7 @@ clean_hdr_image(uint16_t* src_rgb16, uint32_t width, uint32_t height, uint32_t s
 
 /**
  * @~English
- * @private
+ * @internal
  * @brief Performs rate distortion optimization (RDO) on BCn-encoded blocks.
  *
  *        RDO is performed to reduce entropy for a potential subsequent Deflate

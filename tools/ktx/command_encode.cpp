@@ -75,8 +75,8 @@ Encode a KTX2 file.
             @snippet{doc} ktx/encode_utils_basis.h command options_basis_encoders
         <dt>\--format &lt;enum&gt;</dt>
         <dd>KTX format enum that specifies the target ASTC or BCn format.
-            Formats that are neither ASTC nor one of the supported BCn formats
-            are invalid. When specified the ASTC-specific or BCn-specific and
+            Formats that are neither a supported ASTC format nor a supported BCn
+            format are invalid. When specified the ASTC-specific or BCn-specific and
             common encoder options listed @ref ktx\_encode\_options\_encoding
             "below" become valid, otherwise they are ignored.</dd>
     </dl>
@@ -178,7 +178,7 @@ void CommandEncode::OptionsEncode::process(cxxopts::Options&, cxxopts::ParseResu
         vkFormat = *parsedVkFormat;
 
         if (!isFormatAstc(vkFormat) && !isFormatBCn(vkFormat)) {
-            report.fatal_usage("Optional option 'format' is neither an ASTC format nor a supported BCn format.");
+            report.fatal_usage("Optional option 'format' is neither a supported ASTC nor supported BCn format.");
         }
     }
 }
@@ -279,22 +279,14 @@ void CommandEncode::executeEncode() {
     {
       // Can't directly encode from BCn to BCn
       if (options.encodeBCn)
-        fatal_usage("Encoding from BCn format {} to another BCn format {} is not supported. " +
-                        common_fatal_msg,
-                    toString(VkFormat(texture->vkFormat)), toString(options.vkFormat), "BCn");
+          fatal_usage("Encoding from BCn format {} to another BCn format {} is not supported. " +
+                          common_fatal_msg,
+                      toString(VkFormat(texture->vkFormat)), toString(options.vkFormat), "BCn");
       // Can't directly encode from BCn to ASTC
       if (options.encodeASTC)
-        fatal_usage("Encoding from BCn format {} to ASTC format {} is not supported. " + common_fatal_msg,
-                    toString(VkFormat(texture->vkFormat)), toString(options.vkFormat), "ASTC");
+          fatal_usage("Encoding from BCn format {} to ASTC format {} is not supported. " + common_fatal_msg,
+                      toString(VkFormat(texture->vkFormat)), toString(options.vkFormat), "ASTC");
     }
-  
-    // Can't encode from BCn to ASTC
-    if ((model == KHR_DF_MODEL_BC1A || model == KHR_DF_MODEL_BC3 || model == KHR_DF_MODEL_BC4 ||
-         model == KHR_DF_MODEL_BC5 || model == KHR_DF_MODEL_BC6H || model == KHR_DF_MODEL_BC7) &&
-        options.encodeBCn)
-        fatal_usage("Encoding from BCn format {} to another BCn format {} is not supported. " +
-                        common_fatal_msg,
-                    toString(VkFormat(texture->vkFormat)), toString(options.vkFormat), "BCn");
 
     if ((options.selectedCodec == BasisCodec::NONE && !is_hdr) ||
         options.selectedCodec == BasisCodec::BasisLZ ||

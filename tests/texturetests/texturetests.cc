@@ -3455,21 +3455,25 @@ class ktxTexture2BCnEncodeDecodeTestBase
         ASSERT_TRUE(texture->pData != NULL) << "Image data not loaded";
 
         VkFormat compressedFormat = VK_FORMAT_UNDEFINED; /* so that gtest stops complaining */
+        khr_df_model_e expectedModel = KHR_DF_MODEL_UNSPECIFIED;
         ktx_uint32_t expectedDecompressedFormat = texture->vkFormat;
         bool skip_ktxdiff = false;
 
-        const bool isSRGB = KHR_DFDVAL(texture->pDfd + 1, TRANSFER) == KHR_DF_TRANSFER_SRGB;
+        const auto original_tf = ktxTexture2_GetTransferFunction_e(texture);
+        const bool is_srgb = original_tf == KHR_DF_TRANSFER_SRGB;
 
         FileRAII original;
         FileRAII decoded;
 
         std::string rdo_str = rdo ? "_rdo" : "";
+        std::string srgb_str = is_srgb ? "srgb" : "unorm";
 
         switch (bcn) {
-          case KTX_BCN_COMPRESSION_BC1:
-            original = tmpDir / format("encode_rgb8_{}_to_bc1{}_then_decode_original.ktx2", isSRGB ? "srgb" : "unorm", rdo_str);
-            decoded = tmpDir / format("encode_rgb8_{}_to_bc1{}_then_decode_decoded.ktx2", isSRGB ? "srgb" : "unorm", rdo_str);
-            if (isSRGB) {
+          case KTX_BCN_COMPRESSION_BC1: {
+            original = tmpDir / format("encode_rgb8_{}_to_bc1{}_then_decode_original.ktx2", srgb_str, rdo_str);
+            decoded = tmpDir / format("encode_rgb8_{}_to_bc1{}_then_decode_decoded.ktx2", srgb_str, rdo_str);
+            expectedModel = KHR_DF_MODEL_BC1A;
+            if (is_srgb) {
               compressedFormat = VK_FORMAT_BC1_RGB_SRGB_BLOCK;
             } else {
               compressedFormat = VK_FORMAT_BC1_RGB_UNORM_BLOCK;
@@ -3481,42 +3485,51 @@ class ktxTexture2BCnEncodeDecodeTestBase
           case KTX_BCN_COMPRESSION_BC6HS:
             ASSERT_TRUE(false);
             break;
+          }
 
-          case KTX_BCN_COMPRESSION_BC3:
-            original = tmpDir / format("encode_rgba8_{}_to_bc3{}_then_decode_original.ktx2", isSRGB ? "srgb" : "unorm", rdo_str);
-            decoded = tmpDir / format("encode_rgba8_{}_to_bc3{}_then_decode_decoded.ktx2", isSRGB ? "srgb" : "unorm", rdo_str);
-            if (isSRGB) {
+          case KTX_BCN_COMPRESSION_BC3: {
+            original = tmpDir / format("encode_rgba8_{}_to_bc3{}_then_decode_original.ktx2", srgb_str, rdo_str);
+            decoded = tmpDir / format("encode_rgba8_{}_to_bc3{}_then_decode_decoded.ktx2", srgb_str, rdo_str);
+            expectedModel = KHR_DF_MODEL_BC3;
+            if (is_srgb) {
               compressedFormat = VK_FORMAT_BC3_SRGB_BLOCK;
             } else {
               compressedFormat = VK_FORMAT_BC3_UNORM_BLOCK;
             }
             break;
+          }
 
-          case KTX_BCN_COMPRESSION_BC4:
-            ASSERT_FALSE(isSRGB); // should never occur
+          case KTX_BCN_COMPRESSION_BC4: {
+            ASSERT_FALSE(is_srgb); // should never occur
             ASSERT_EQ(texture->vkFormat, (ktx_uint32_t)VK_FORMAT_R8_UNORM);
             original = tmpDir / format("encode_r8_unorm_to_bc4{}_then_decode_original.ktx2", rdo_str);
             decoded = tmpDir / format("encode_r8_unorm_to_bc4{}_then_decode_decoded.ktx2", rdo_str);
             compressedFormat = VK_FORMAT_BC4_UNORM_BLOCK;
+            expectedModel = KHR_DF_MODEL_BC4;
             break;
+          }
 
-          case KTX_BCN_COMPRESSION_BC5:
-            ASSERT_FALSE(isSRGB); // should never occur
+          case KTX_BCN_COMPRESSION_BC5: {
+            ASSERT_FALSE(is_srgb); // should never occur
             ASSERT_TRUE(texture->vkFormat == VK_FORMAT_R8G8_UNORM ||
                         texture->vkFormat == VK_FORMAT_R8G8_SNORM);
-            original = tmpDir / format("encode_rg8_{}_to_bc5{}_then_decode_original.ktx2", texture->vkFormat == VK_FORMAT_R8G8_UNORM ? "unorm" : "snorm", rdo_str);
-            decoded = tmpDir / format("encode_rg8_{}_to_bc5{}_then_decode_decoded.ktx2", texture->vkFormat == VK_FORMAT_R8G8_UNORM ? "unorm" : "snorm", rdo_str);
+            const auto norm_str = texture->vkFormat == VK_FORMAT_R8G8_UNORM ? "unorm" : "snorm";
+            original = tmpDir / format("encode_rg8_{}_to_bc5{}_then_decode_original.ktx2", norm_str, rdo_str);
+            decoded = tmpDir / format("encode_rg8_{}_to_bc5{}_then_decode_decoded.ktx2", norm_str, rdo_str);
+            expectedModel = KHR_DF_MODEL_BC5;
             if (texture->vkFormat == VK_FORMAT_R8G8_UNORM) {
               compressedFormat = VK_FORMAT_BC5_UNORM_BLOCK;
             } else {
               compressedFormat = VK_FORMAT_BC5_SNORM_BLOCK;
             }
             break;
+          }
 
-          case KTX_BCN_COMPRESSION_BC6HU:
-            ASSERT_FALSE(isSRGB);   // should never occur
+          case KTX_BCN_COMPRESSION_BC6HU: {
+            ASSERT_FALSE(is_srgb);   // should never occur
             ASSERT_FALSE(rdo);      // HDR rdo is not supported (yet)
             compressedFormat = VK_FORMAT_BC6H_UFLOAT_BLOCK;
+            expectedModel = KHR_DF_MODEL_BC6H;
             // RGBA16 when encoded decodes into RGB16 (i.e., Alpha is dropped)
             if (texture->vkFormat == VK_FORMAT_R16G16B16A16_SFLOAT) {
                 original = tmpDir / "encode_rgba16_sfloat_to_bc6hu_then_decode_original.ktx2";
@@ -3528,16 +3541,15 @@ class ktxTexture2BCnEncodeDecodeTestBase
                 decoded = tmpDir / "encode_rgb16_sfloat_to_bc6hu_then_decode_decoded.ktx2";
             }
             break;
+          }
 
-          case KTX_BCN_COMPRESSION_BC7:
-            original = tmpDir / format("encode_rgba8_{}_to_bc7{}_then_decode_original.ktx2", isSRGB ? "srgb" : "unorm", rdo_str);
-            decoded = tmpDir / format("encode_rgba8_{}_to_bc7{}_then_decode_decoded.ktx2", isSRGB ? "srgb" : "unorm", rdo_str);
-            if (isSRGB) {
-              compressedFormat = VK_FORMAT_BC7_SRGB_BLOCK;
-            } else {
-              compressedFormat = VK_FORMAT_BC7_UNORM_BLOCK;
-            }
+          case KTX_BCN_COMPRESSION_BC7: {
+            original = tmpDir / format("encode_rgba8_{}_to_bc7{}_then_decode_original.ktx2", srgb_str, rdo_str);
+            decoded = tmpDir / format("encode_rgba8_{}_to_bc7{}_then_decode_decoded.ktx2", srgb_str, rdo_str);
+            expectedModel = KHR_DF_MODEL_BC7;
+            compressedFormat = is_srgb ? VK_FORMAT_BC7_SRGB_BLOCK : VK_FORMAT_BC7_UNORM_BLOCK;
             break;
+          }
 
           default:  // should never occur
             ASSERT_TRUE(false);
@@ -3566,13 +3578,9 @@ class ktxTexture2BCnEncodeDecodeTestBase
         ASSERT_EQ(result, KTX_SUCCESS);
         ASSERT_EQ(texture->vkFormat, (ktx_uint32_t)compressedFormat);
 
-        uint32_t* pBdb = texture->pDfd + 1;
-        if (isSRGB) {
-            EXPECT_TRUE(KHR_DFDVAL(pBdb, TRANSFER) == KHR_DF_TRANSFER_SRGB);
-        }
-        khr_df_model_e model = static_cast<khr_df_model_e>(KHR_DFDVAL(pBdb, MODEL));
-        // TODO: check that model is correctly set
-        // EXPECT_EQ(model, color);
+        EXPECT_TRUE(ktxTexture2_GetTransferFunction_e(texture) == original_tf);
+        khr_df_model_e model = ktxTexture2_GetColorModel_e(texture);
+        EXPECT_EQ(model, expectedModel);
         EXPECT_EQ(texture->supercompressionScheme, KTX_SS_NONE);
         EXPECT_TRUE(texture->_private->_supercompressionGlobalData == (ktx_uint8_t*)0);
         EXPECT_EQ(texture->numLevels, helper.numLevels);
@@ -3585,7 +3593,7 @@ class ktxTexture2BCnEncodeDecodeTestBase
 
         ASSERT_EQ(result, KTX_SUCCESS) << format("ktxTexture2_DecodeBCn failed with error code: {}", ktxErrorString(result));
         EXPECT_EQ(texture->vkFormat, expectedDecompressedFormat);
-        model = static_cast<khr_df_model_e>(KHR_DFDVAL(texture->pDfd + 1, MODEL));
+        model = ktxTexture2_GetColorModel_e(texture);
         EXPECT_EQ(model, KHR_DF_MODEL_RGBSDA);
         EXPECT_EQ(depth, texture->baseDepth);
         EXPECT_EQ(texture->baseHeight, height);

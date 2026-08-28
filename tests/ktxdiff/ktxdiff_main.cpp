@@ -4,7 +4,6 @@
 
 #include "ktx.h"
 #include "ktxint.h"
-#include "transcoder/basisu_transcoder_internal.h"
 #include "vkformat_enum.h"
 #include "platform_utils.h"
 #include "imageio_utility.h"
@@ -250,9 +249,8 @@ CompareResult compareSFloat16(const char* rawLhs, const char* rawRhs, std::size_
     const auto baseline = (std::numeric_limits<float>::epsilon() * 100000) * tolerance;
 
     for (std::size_t i = 0; i < count; ++i) {
-        // TODO: make sure to revert this or replace imageio's half_to_float with Basis Universal's version
-        const auto lhsFloat = basist::half_to_float(lhs[i]);
-        const auto rhsFloat = basist::half_to_float(rhs[i]);
+        const auto lhsFloat = imageio::half_to_float(lhs[i]);
+        const auto rhsFloat = imageio::half_to_float(rhs[i]);
         if (ignore_signed && (lhsFloat < 0 || rhsFloat < 0))
             continue;
         if (std::isnan(lhsFloat) || std::isnan(rhsFloat))
