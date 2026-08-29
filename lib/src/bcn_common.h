@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <cstring>
 #include "ktx.h"
+#include "transcoder/basisu_transcoder_internal.h"
 #include "vulkan/vulkan_core.h"
 #include <algorithm>
 
@@ -53,7 +54,10 @@ struct bcn_compression_workload {
     uint32_t height;
     uint32_t nchannels;
     ktxBCnParams params;
-    const void* data_in;  /* uint8_t* for LDR or uint16_t* for HDR */
+    union {
+        const uint8_t* ldr;
+        const uint16_t* hdr;
+    } data_in;
     uint8_t* data_out;
 };
 
@@ -88,20 +92,20 @@ inline uint32_t
 get_bc7_compression_quality(ktx_pack_bcn_quality_levels bcn_quality) {
     switch (bcn_quality) {
     case ktx_pack_bcn_quality_levels_e::KTX_PACK_BCN_QUALITY_LEVEL_FASTEST:
-        return 128U; /* cPackBC7FlagDefaultFastest */
+        return basist::bc7f::cPackBC7FlagDefaultFastest;
     case ktx_pack_bcn_quality_levels_e::KTX_PACK_BCN_QUALITY_LEVEL_FASTER:
-        return 176U; /* cPackBC7FlagDefaultFaster */
+        return basist::bc7f::cPackBC7FlagDefaultFaster;
     case ktx_pack_bcn_quality_levels_e::KTX_PACK_BCN_QUALITY_LEVEL_FAST:
-        return 179U; /* cPackBC7FlagDefaultFast */
+        return basist::bc7f::cPackBC7FlagDefaultFast;
     case ktx_pack_bcn_quality_levels_e::KTX_PACK_BCN_QUALITY_LEVEL_MEDIUM:
-        return 255U; /* cPackBC7FlagDefault */
+        return basist::bc7f::cPackBC7FlagDefault;
     case ktx_pack_bcn_quality_levels_e::KTX_PACK_BCN_QUALITY_LEVEL_THOROUGH:
-        return 1023U; /* cPackBC7FlagDefaultPartiallyAnalytical */
+        return basist::bc7f::cPackBC7FlagDefaultPartiallyAnalytical;
     case ktx_pack_bcn_quality_levels_e::KTX_PACK_BCN_QUALITY_LEVEL_EXHAUSTIVE:
-        return 3967U; /* cPackBC7FlagDefaultNonAnalytical */
-    default:          // should never occur
+        return basist::bc7f::cPackBC7FlagDefaultNonAnalytical;
+    default:  // should never occur
         assert(false);
-        return 1023U;
+        return basist::bc7f::cPackBC7FlagDefaultPartiallyAnalytical;
     }
 }
 
@@ -250,7 +254,7 @@ insert_block(T* dst, const T* src, uint32_t x, uint32_t y, uint32_t width, uint3
     return nbr_written_bytes;
 }
 
-template<typename T>
+template <typename T>
 inline void
 extract_rgb_from_rgba_block(T* rgb, const T* rgba) {
     const uint32_t src_pitch = 4 * 4;
@@ -281,107 +285,68 @@ rgb_to_rgba_block(uint8_t* rgba, const uint8_t* rgb, uint8_t alpha = 255) {
     assert(nbr_written_bytes_total == 4 * 4 * 4);
 }
 
+// Returns BCn compression kind from given VkFormat or KTX_BCN_COMPRESSION_NONE
+// in case given VkFormat is not a BCn format.
 inline ktx_bcn_compression_e
-get_bcn_compression_kind(VkFormat vkformat, VkFormat& decompressed_vkformat, int& nchannels) {
+get_bcn_compression_kind(VkFormat vkformat) {
     switch (vkformat) {
-        /* BC1 */
     case VK_FORMAT_BC1_RGB_UNORM_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8G8B8_UNORM;
-        nchannels = BC1_NCHANNELS; /* 3 */
-        return KTX_BCN_COMPRESSION_BC1;
-
     case VK_FORMAT_BC1_RGB_SRGB_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8G8B8_SRGB;
-        nchannels = BC1_NCHANNELS; /* 3 */
         return KTX_BCN_COMPRESSION_BC1;
-
-        /* BC1A */
     case VK_FORMAT_BC1_RGBA_UNORM_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8G8B8A8_UNORM;
-        nchannels = BC1A_NCHANNELS; /* 4 */
-        return KTX_BCN_COMPRESSION_BC1A;
-
     case VK_FORMAT_BC1_RGBA_SRGB_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8G8B8A8_SRGB;
-        nchannels = BC1A_NCHANNELS; /* 4 */
         return KTX_BCN_COMPRESSION_BC1A;
-
-        /* BC2 */
     case VK_FORMAT_BC2_UNORM_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8G8B8A8_UNORM;
-        nchannels = BC2_NCHANNELS; /* 4 */
-        return KTX_BCN_COMPRESSION_BC2;
-
     case VK_FORMAT_BC2_SRGB_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8G8B8A8_SRGB;
-        nchannels = BC2_NCHANNELS; /* 4 */
         return KTX_BCN_COMPRESSION_BC2;
-
-        /* BC3 */
     case VK_FORMAT_BC3_UNORM_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8G8B8A8_UNORM;
-        nchannels = BC3_NCHANNELS; /* 4 */
-        return KTX_BCN_COMPRESSION_BC3;
-
     case VK_FORMAT_BC3_SRGB_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8G8B8A8_SRGB;
-        nchannels = BC3_NCHANNELS; /* 4 */
         return KTX_BCN_COMPRESSION_BC3;
-
-        /* BC4 */
     case VK_FORMAT_BC4_UNORM_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8_UNORM;
-        nchannels = BC4_NCHANNELS; /* 1 */
-        return KTX_BCN_COMPRESSION_BC4;
-
     case VK_FORMAT_BC4_SNORM_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8_SNORM;
-        nchannels = BC4_NCHANNELS; /* 1 */
         return KTX_BCN_COMPRESSION_BC4;
-
-        /* BC5 */
     case VK_FORMAT_BC5_UNORM_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8G8_UNORM;
-        nchannels = BC5_NCHANNELS; /* 2 */
-        return KTX_BCN_COMPRESSION_BC5;
-
     case VK_FORMAT_BC5_SNORM_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8G8_SNORM;
-        nchannels = BC5_NCHANNELS; /* 2 */
         return KTX_BCN_COMPRESSION_BC5;
-
-        /* BC6HU */
     case VK_FORMAT_BC6H_UFLOAT_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R16G16B16_SFLOAT;
-        nchannels = BC6H_NCHANNELS; /* 3 */
         return KTX_BCN_COMPRESSION_BC6HU;
-
-        /* BC6HS */
     case VK_FORMAT_BC6H_SFLOAT_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R16G16B16_SFLOAT;
-        nchannels = BC6H_NCHANNELS; /* 3 */
         return KTX_BCN_COMPRESSION_BC6HS;
-
-        /* BC7 */
     case VK_FORMAT_BC7_UNORM_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8G8B8A8_UNORM;
-        nchannels = BC7_NCHANNELS; /* 4 */
-        return KTX_BCN_COMPRESSION_BC7;
-
     case VK_FORMAT_BC7_SRGB_BLOCK:
-        decompressed_vkformat = VK_FORMAT_R8G8B8A8_SRGB;
-        nchannels = BC7_NCHANNELS; /* 4 */
         return KTX_BCN_COMPRESSION_BC7;
-
     default:
-        decompressed_vkformat = VK_FORMAT_UNDEFINED;
-        nchannels = -1;
         return KTX_BCN_COMPRESSION_NONE;
     }
 }
 
+inline VkFormat
+get_bcn_decompressed_format(ktx_bcn_compression_e bcn, khr_df_transfer_e tf, VkFormat vkformat) {
+    const bool is_srgb = tf == KHR_DF_TRANSFER_SRGB;
+    switch (bcn) {
+    case KTX_BCN_COMPRESSION_BC4:
+        return vkformat == VK_FORMAT_BC4_UNORM_BLOCK ? VK_FORMAT_R8_UNORM : VK_FORMAT_R8_SNORM;
+    case KTX_BCN_COMPRESSION_BC5:
+        return vkformat == VK_FORMAT_BC5_UNORM_BLOCK ? VK_FORMAT_R8G8_UNORM : VK_FORMAT_R8G8_SNORM;
+    case KTX_BCN_COMPRESSION_BC1:
+        return is_srgb ? VK_FORMAT_R8G8B8_SRGB : VK_FORMAT_R8G8B8_UNORM;
+    case KTX_BCN_COMPRESSION_BC1A:
+    case KTX_BCN_COMPRESSION_BC2:
+    case KTX_BCN_COMPRESSION_BC3:
+    case KTX_BCN_COMPRESSION_BC7:
+        return is_srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
+    case KTX_BCN_COMPRESSION_BC6HU:
+    case KTX_BCN_COMPRESSION_BC6HS:
+        return VK_FORMAT_R16G16B16_SFLOAT;
+    default:
+        return VK_FORMAT_UNDEFINED;
+    }
+}
+
+// Returns number of channels for given BCn compression kind or 0 in case of
+// KTX_BCN_COMPRESSION_NONE.
 inline uint32_t
-get_nchannels(ktx_bcn_compression_e bcn) {
+get_bcn_nchannels(ktx_bcn_compression_e bcn) {
     switch (bcn) {
     case KTX_BCN_COMPRESSION_BC4:
         return 1;
@@ -398,6 +363,33 @@ get_nchannels(ktx_bcn_compression_e bcn) {
         return 4;
     default:
         return 0;
+    }
+}
+
+// Returns corresponding KHR color model for the given BCn compression
+// kind if BCn is not KTX_BCN_COMPRESSION_NONE otherwise returns
+// KHR_DF_MODEL_UNSPECIFIED.
+inline khr_df_model_e
+get_bcn_colormodel(ktx_bcn_compression_e bcn) {
+    switch (bcn) {
+    case KTX_BCN_COMPRESSION_BC1:
+    case KTX_BCN_COMPRESSION_BC1A:
+        return KHR_DF_MODEL_BC1A;
+    case KTX_BCN_COMPRESSION_BC2:
+        return KHR_DF_MODEL_BC2;
+    case KTX_BCN_COMPRESSION_BC3:
+        return KHR_DF_MODEL_BC3;
+    case KTX_BCN_COMPRESSION_BC4:
+        return KHR_DF_MODEL_BC4;
+    case KTX_BCN_COMPRESSION_BC5:
+        return KHR_DF_MODEL_BC5;
+    case KTX_BCN_COMPRESSION_BC6HU:
+    case KTX_BCN_COMPRESSION_BC6HS:
+        return KHR_DF_MODEL_BC6H;
+    case KTX_BCN_COMPRESSION_BC7:
+        return KHR_DF_MODEL_BC7;
+    default:
+        return KHR_DF_MODEL_UNSPECIFIED;
     }
 }
 

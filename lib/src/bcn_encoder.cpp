@@ -405,11 +405,11 @@ compression_workload_runner(int thread_count, int thread_id, void* payload) {
     block_end_idx = block_start_idx + num_blocks;
 
     // Intermediate store for decoded LDR/HDR BCn block
-    uint8_t rgba[4 * 4 * 4];  /* 4 x 4 x 4 */
-    uint8_t rgb[4 * 4 * 3];   /* only for BC1 */
-    uint16_t rgbh[4 * 4 * 3]; /* 4 x 4 x 3 x 2 - for BC6H? */
+    uint8_t rgba[4 * 4 * 4];   /* 4 x 4 x 4 */
+    uint8_t rgb[4 * 4 * 3];    /* only for BC1 */
+    uint16_t rgbh[4 * 4 * 3];  /* 4 x 4 x 3 x 2 - for BC6H? */
     uint16_t rgbah[4 * 4 * 4]; /* 4 x 4 x 4 x 2 - for BC6H? with Alpha input */
-    uint8_t rgbx[4 * 4 * 4];  /* only for BC1 */
+    uint8_t rgbx[4 * 4 * 4];   /* only for BC1 */
 
     basist::color_rgba rgba_bc7[16];
 
@@ -428,19 +428,20 @@ compression_workload_runner(int thread_count, int thread_id, void* payload) {
             // If input is RGBA 16, then we need to extract the RGB block (drop alpha)
             // before passing the block pixels to the bc6hu encoder which expects RGB 16
             if (nchannels == 4) {
-                extract_block(rgbah, static_cast<const uint16_t*>(workload->data_in), xBlock * 4,
-                              yBlock * 4, width, height, 4);
+                extract_block(rgbah, workload->data_in.hdr, xBlock * 4, yBlock * 4, width, height,
+                              4);
                 extract_rgb_from_rgba_block(rgbh, rgbah);
             } else {
-                extract_block(rgbh, static_cast<const uint16_t*>(workload->data_in), xBlock * 4,
-                              yBlock * 4, width, height, nchannels /* 3 */);
+                extract_block(rgbh, workload->data_in.hdr, xBlock * 4, yBlock * 4, width, height,
+                              nchannels /* 3 */);
             }
         } else if (workload->params.bcn == KTX_BCN_COMPRESSION_BC1) {
             // BC1 is an edge case because encoder expects 4 while input is 3
-            extract_block(rgb, static_cast<const uint8_t*>(workload->data_in), xBlock * 4, yBlock * 4, width, height, nchannels);
+            extract_block(rgb, workload->data_in.ldr, xBlock * 4, yBlock * 4, width, height,
+                          nchannels);
             rgb_to_rgba_block(rgbx, rgb);
         } else {
-            extract_block(rgba, static_cast<const uint8_t*>(workload->data_in), xBlock * 4, yBlock * 4, width, height,
+            extract_block(rgba, workload->data_in.ldr, xBlock * 4, yBlock * 4, width, height,
                           nchannels);
         }
 
@@ -485,8 +486,9 @@ compression_workload_runner(int thread_count, int thread_id, void* payload) {
 
         case KTX_BCN_COMPRESSION_BC7:
             // BC7: 4 x 4 x 4 = 64 bytes -> 16 bytes
-            // This is probably not needed because libktx is compiled with strict aliasing while basisu is
-            // compiled with '-fno-strict-aliasing'. basist::color_rgba is a trivial type after all
+            // This is probably not needed because libktx is compiled with strict aliasing while
+            // basisu is compiled with '-fno-strict-aliasing'. basist::color_rgba is a trivial type
+            // after all
             memcpy(rgba_bc7, rgba, sizeof(rgba_bc7));
             basist::bc7f::fast_pack_bc7_auto_rgba(
                 pDstLevelImage + (yBlock * num_blocks_x + xBlock) * BC7_BLOCK_SIZE, rgba_bc7,
@@ -923,7 +925,7 @@ struct clean_hdr_results {
  */
 static clean_hdr_results
 clean_hdr_image(uint16_t* src_rgb16, uint32_t width, uint32_t height, uint32_t stride) {
-    assert(stride == 3 || stride == 4);  /* only RGB[A] */
+    assert(stride == 3 || stride == 4); /* only RGB[A] */
     clean_hdr_results res;
     res.hdr_image_scale = 1.0;
     auto p_src = src_rgb16;
@@ -967,24 +969,24 @@ clean_hdr_image(uint16_t* src_rgb16, uint32_t width, uint32_t height, uint32_t s
     return res;
 }
 
-//************************************************************************
-//*                   RDO post-processing function                       *
-//************************************************************************
+//******************************************************************************
+//*                      RDO post-processing function                          *
+//******************************************************************************
 
 /**
  * @~English
  * @internal
  * @brief Performs rate distortion optimization (RDO) on BCn-encoded blocks.
  *
- *        RDO is performed to reduce entropy for a potential subsequent Deflate
- *        step (i.e., significant bit rate reduction can be achieved when
- *        further supercompressed with Zlib/ZSTD). BC2 and BC6H formats are
- *        currently not supported.
+ * RDO is performed to reduce entropy for a potential subsequent Deflate step
+ * (i.e., significant bit rate reduction can be achieved when further
+ * supercompressed with Zlib/ZSTD). BC2 and BC6H formats are currently not
+ * supported.
  *
- *        Some values of the reduce_entropy_params struct may be adjusted before
- *        being passed to the underlying RDO subroutine. The reason for this is
- *        that, depending on the BCn compression, some values make no sense and
- *        may kill efficiency.
+ * Some values of the reduce_entropy_params struct may be adjusted before being
+ * passed to the underlying RDO subroutine. The reason for this is that,
+ * depending on the BCn compression, some values make no sense and may kill
+ * efficiency.
  *
  * @param [in] unpacked_img         pointer to the source unpacked data.
  * @param [in] unpacked_img_size    size of source unpacked data in bytes.
@@ -1503,6 +1505,7 @@ ktxTexture2_CompressBCnEx(ktxTexture2* This, ktxBCnParams* params) {
     uint32_t blocksize_in_bytes;
     VkFormat compressedVkFormat;
     ktx_error_code_e result;
+    bool is_hdr = false;
 #if DEBUG_PRINT_STATS
     bool hdr_one_or_more_nan_values_msg = false;
     bool hdr_one_or_more_inf_values_msg = false;
@@ -1588,6 +1591,7 @@ ktxTexture2_CompressBCnEx(ktxTexture2* This, ktxBCnParams* params) {
         }
         blocksize_in_bytes = BC6H_BLOCK_SIZE;
         expected_color_model = khr_df_model_e::KHR_DF_MODEL_BC6H;
+        is_hdr = true;
         basist::basisu_transcoder_init();
         break;
 
@@ -1698,15 +1702,18 @@ ktxTexture2_CompressBCnEx(ktxTexture2* This, ktxBCnParams* params) {
         work.height = height;
 
         for (uint32_t image = 0; image < levelImages; image++) {
-            work.data_in = pSrcLevelImage;
+            if (is_hdr)
+                work.data_in.hdr = reinterpret_cast<uint16_t*>(pSrcLevelImage);
+            else
+                work.data_in.ldr = pSrcLevelImage;
             work.data_out = pDstLevelImage;
 
             // HDR input may require some cleanup for basisu's bc6hu encoder
             if (defaulted_params.bcn == KTX_BCN_COMPRESSION_BC6HU) {
                 // TODO: Basisu's outputs warning if HDR pixels are cleaned up.
                 // Should we also do that in here?
-                [[maybe_unused]] auto hdr_cleanup_res =
-                    clean_hdr_image(reinterpret_cast<uint16_t*>(pSrcLevelImage), width, height, nchannels);
+                [[maybe_unused]] auto hdr_cleanup_res = clean_hdr_image(
+                    reinterpret_cast<uint16_t*>(pSrcLevelImage), width, height, nchannels);
 #if DEBUG_PRINT_STATS
                 if (hdr_cleanup_res.one_or_more_nan_values && !hdr_one_or_more_nan_values_msg) {
                     std::cout << "One or more input pixels was NaN, setting to 0." << '\n';

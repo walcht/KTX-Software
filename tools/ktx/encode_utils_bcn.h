@@ -26,8 +26,8 @@ namespace ktx {
     <dl>
         <dt>\--bcn-quality &lt;level&gt;</dt>
         <dd>The quality level configures the quality-performance tradeoff for
-            BC1, BC3, and BC7 encoders. Can also be set via the following
-            presets for BC1/BC3 (range [0,19]):
+            BC1, BC3, and BC7 encoders. For BC1/BC3, range is [0,19]. For BC7,
+            one of the following presets has to be supplied:
             <table>
                 <tr><th>Level      </th> <th> Quality (only BC1/BC3)       </th></tr>
                 <tr><td>fastest    </td> <td>(equivalent to quality =   0) </td></tr>
@@ -36,16 +36,6 @@ namespace ktx {
                 <tr><td>medium     </td> <td>(equivalent to quality =  10) </td></tr>
                 <tr><td>thorough   </td> <td>(equivalent to quality =  15) </td></tr>
                 <tr><td>exhaustive </td> <td>(equivalent to quality =  19) </td></tr>
-            </table>
-            And for BC7 (OR'ed flags):
-            <table>
-                <tr><th>Level      </th> <th> OR'ed flags (only BC7)         </th></tr>
-                <tr><td>fastest    </td> <td>(equivalent to quality =   128) </td></tr>
-                <tr><td>faster     </td> <td>(equivalent to quality =   176) </td></tr>
-                <tr><td>fast       </td> <td>(equivalent to quality =   179) </td></tr>
-                <tr><td>medium     </td> <td>(equivalent to quality =   255) </td></tr>
-                <tr><td>thorough   </td> <td>(equivalent to quality =  1023) </td></tr>
-                <tr><td>exhaustive </td> <td>(equivalent to quality =  3967) </td></tr>
             </table>
             Note on BC1 vs. BC3 vs. BC7: apart from lower VRAM consumption (4bpp
             vs. 8bpp) and better GPU texture cache efficiency, there's little
@@ -175,7 +165,8 @@ struct OptionsEncodeBCn : public ktxBCnParams {
         opts.add_options("Encode BCn")(
             kBCnQuality,
             "The quality level configures the quality-performance tradeoff for BC1, BC3, and BC7 "
-            "encoders. Can also be set via the following presets for BC1/BC3 (range [0,19]):\n\n"
+            "encoders. For BC1/BC3, range is [0,19]. For BC7, one of the following presets has to "
+            "be supplied:\n\n"
             "    Level      |  Quality (only for BC1/BC3)\n"
             "    ---------- | ----------------------------\n"
             "    fastest    | (equivalent to quality =  0)\n"
@@ -184,15 +175,6 @@ struct OptionsEncodeBCn : public ktxBCnParams {
             "    medium     | (equivalent to quality = 10)\n"
             "    thorough   | (equivalent to quality = 15)\n"
             "    exhaustive | (equivalent to quality = 19)\n\n"
-            "And for BC7 (OR'ed flags):\n\n"
-            "    Level      |  OR'ed flags (only for BC7)\n"
-            "    ---------- | ----------------------------\n"
-            "    fastest    | (equivalent to flags =  128)\n"
-            "    faster     | (equivalent to flags =  176)\n"
-            "    fast       | (equivalent to flags =  179)\n"
-            "    medium     | (equivalent to flags =  255)\n"
-            "    thorough   | (equivalent to flags = 1023)\n"
-            "    exhaustive | (equivalent to flags = 3967)\n\n"
             "Default is 'thorough'. Note on BC1 vs. BC3 vs. BC7: apart from lower VRAM consumption "
             "(4bpp vs. 8bpp) and better GPU texture cache efficiency, there's little need to use "
             "BC1 now. BC7 offers significantly better quality than BC1 and BC3. BC3 still has an "
@@ -274,8 +256,7 @@ struct OptionsEncodeBCn : public ktxBCnParams {
                 } catch (const std::exception&) {
                     report.fatal_usage(
                         "Invalid bcn-quality value. Expected a quality level string preset (e.g., "
-                        "'medium'), or range [0,19] for BC1/BC3, or an OR'ed set of flags for BC7 "
-                        "but got: \"{}\"",
+                        "'medium'), or range [0,19] for BC1/BC3 but got: \"{}\"",
                         qualityLevelStr);
                 }
             } else {

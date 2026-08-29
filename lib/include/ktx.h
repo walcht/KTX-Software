@@ -1409,26 +1409,26 @@ typedef struct ktxAstcParams {
 
 /**
  * @~English
- * @brief Options specifiying high-level BC1, BC2, BC3, and BC7 encoding quality
+ * @brief Options specifiying high-level BC1, BC3, and BC7 encoding quality
  *        levels.
  *
- * These enums will be mapped to their corresponding BC1 or BC7 quality values.
- * For BC1, these are mapped to [0, 19]. For BC7, these are mapped to particular
- * bitsets of flags.
+ * These enums will be mapped to their corresponding BC1/BC3 or BC7 quality
+ * values. For BC1/BC3, these are mapped to [0, 19]. For BC7, these are mapped
+ * to particular bitsets of internal flags.
  */
 typedef enum ktx_pack_bcn_quality_levels_e {
-    KTX_PACK_BCN_QUALITY_LEVEL_FASTEST,
-        /*!< Fastest compression. */
-    KTX_PACK_BCN_QUALITY_LEVEL_FASTER,
-        /*!< Faster compression. */
-    KTX_PACK_BCN_QUALITY_LEVEL_FAST,
-        /*!< Fast compression. */
-    KTX_PACK_BCN_QUALITY_LEVEL_MEDIUM,
-        /*!< Medium compression. */
-    KTX_PACK_BCN_QUALITY_LEVEL_THOROUGH,
-        /*!< Thorough compression. */
-    KTX_PACK_BCN_QUALITY_LEVEL_EXHAUSTIVE,
-        /*!< Exhaustive compression. */
+    KTX_PACK_BCN_QUALITY_LEVEL_FASTEST    = 0U,
+        /*!< Fastest compression. For BC1/BC3, this maps to 0. */
+    KTX_PACK_BCN_QUALITY_LEVEL_FASTER     = 1U,
+        /*!< Faster compression. For BC1/BC3, this maps to 2. */
+    KTX_PACK_BCN_QUALITY_LEVEL_FAST       = 2U,
+        /*!< Fast compression. For BC1/BC3, this maps to 5. */
+    KTX_PACK_BCN_QUALITY_LEVEL_MEDIUM     = 3U,
+        /*!< Medium compression. For BC1/BC3, this maps to 10. */
+    KTX_PACK_BCN_QUALITY_LEVEL_THOROUGH   = 4U,
+        /*!< Thorough compression. For BC1/BC3, this maps to 15. */
+    KTX_PACK_BCN_QUALITY_LEVEL_EXHAUSTIVE = 5U,
+        /*!< Exhaustive compression. For BC1/BC3, this maps to 19. */
     KTX_PACK_BCN_QUALITY_LEVEL_MAX = KTX_PACK_BCN_QUALITY_LEVEL_EXHAUSTIVE,
 } ktx_pack_bcn_quality_levels_e;
 typedef ktx_uint32_t ktx_pack_bcn_quality_levels;
@@ -1441,21 +1441,23 @@ typedef enum ktx_bcn_compression_e {
     KTX_BCN_COMPRESSION_NONE    = 0,
         /*!< NONE. */
     KTX_BCN_COMPRESSION_BC1     = 1,
-        /*!< BC1 compression (RGB). */
+        /*!< BC1 compression (RGB). Encodes a 4x4 RGB LDR block into 8 bytes. */
     KTX_BCN_COMPRESSION_BC1A    = 2,
-        /*!< BC1 compression. Encodes a 4x4 RGBA LDR RGBA block into 8 bytes.
+        /*!< BC1 compression. Encodes a 4x4 RGBA LDR block into 8 bytes.
            Alpha is encoded just using 1 bit (i.e., fully opaque or fully
            transparent).
          */
     KTX_BCN_COMPRESSION_BC2     = 3,
         /*!< BC2 compression. Encodes a 4x4 RGBA LDR block into 16 bytes.
-           RGB block is encoded using BC1 into 8 bytes. Alpha is sharply encoded
-           into 8 bytes.
+           RGB block is encoded using BC1 into 8 bytes. Alpha is encoded into
+           8 bytes by directly storing the 16 alpha values into 8 bytes (i.e.,
+           each alpha value is stored using just 4 bits).
          */
     KTX_BCN_COMPRESSION_BC3     = 4,
         /*!< BC3 compression. Encodes a 4x4 RGBA LDR block into 16 bytes.
            RGB block is encoded using BC1 into 8 bytes. Alpha is encoded
-           separately into 8 bytes.
+           into 8 bytes using two reference alpha points and 16 3-bit alpha
+           indices for interpolation.
          */
     KTX_BCN_COMPRESSION_BC4     = 5,
         /*!< BC4 compression. Encodes a 4x4 R LDR block into 8 bytes. */

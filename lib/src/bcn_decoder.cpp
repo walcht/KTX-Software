@@ -59,33 +59,38 @@ unpack_block_bc3(const void* pBlock, void* pPixels, rgbcx::bc1_approx_mode bc1_a
 
 /**
  * @ingroup reader
- * @brief Decodes a ktx2 texture object, if it is BCn encoded. All BCn
- *        formats are supported (BC1, BC2, BC3, BC4, BC5, BC6HU, BC6HS, or BC7).
+ * @brief Decodes a ktx2 texture object, if it is BCn encoded.
  *
- *        The decompressed format is determined from corresponding BCn format.
- *        - For BC1:
- *            VK_FORMAT_R8G8B8_[UNORM|SRGB]
- *        - For BC2, BC3, and BC7:
- *            VK_FORMAT_R8G8B8A8_[UNORM|SRGB]
- *        - For BC4:
- *            VK_FORMAT_R8_[UNORM|SNORM]
- *        - For BC5:
- *            VK_FORMAT_R8G8_[UNORM|SNORM]
- *        - For BC6HU, BC6HS:
- *            VK_FORMAT_R16G16B16_SFLOAT
+ * All BCn formats are supported (BC1, BC2, BC3, BC4, BC5, BC6HU, BC6HS, or
+ * BC7).
  *
- *        UNORM vs. SRGB is determined depending on the original BCn VkFormat.
+ * The decompressed format is determined from corresponding BCn format and the
+ * transfer function in DFD:
+ * - For BC1:
+ *     VK_FORMAT_R8G8B8_[UNORM|SRGB]
+ * - For BC2, BC3, and BC7:
+ *     VK_FORMAT_R8G8B8A8_[UNORM|SRGB]
+ * - For BC4:
+ *     VK_FORMAT_R8_[UNORM|SNORM]
+ * - For BC5:
+ *     VK_FORMAT_R8G8_[UNORM|SNORM]
+ * - For BC6HU, BC6HS:
+ *     VK_FORMAT_R16G16B16_SFLOAT
  *
- *        The images are decompressed from BCn block-compressed format. The
- *        decompressed images replace the original images and the texture's
- *        fields including the DFD are modified to reflect the new state.
+ * UNORM vs. SRGB is determined depending on the original transfer function
+ * value in the DFD.
  *
- *        Such textures can be directly uploaded to the GPU as raw
- *        (decompressed) formats.
+ * UNORM vs. SNORM is determined based on the original VkFormat.
  *
- *        Decoding into non-multiple-of-4 texture dimensions is also supported
- *        (decoded blocks that fall out of the texture's dimensions are simply
- *        discarded).
+ * The images are decompressed from BCn block-compressed format. The
+ * decompressed images replace the original images and the texture's fields
+ * including the DFD are modified to reflect the new state.
+ *
+ * Such textures can be directly uploaded to the GPU as raw (decompressed)
+ * formats.
+ *
+ * Decoding into non-multiple-of-4 texture dimensions is also supported (decoded
+ * blocks that fall out of the texture's dimensions are simply discarded).
  *
  * @param [in] This   pointer to the ktxTexture2 object of interest.
  *
@@ -93,13 +98,14 @@ unpack_block_bc3(const void* pBlock, void* pPixels, rgbcx::bc1_approx_mode bc1_a
  *
  * @exception KTX_FILE_DATA_ERROR
  *                    The texture's supercompression scheme is invalid.
+ * @exception KTX_FILE_DATA_ERROR
+ *                    @c This->vkFormat does not correspond to the set BCn color
+ *                    model.
  * @exception KTX_INVALID_OPERATION
  *                    The texture is not compressed (i.e.,
  *                    @c This->isCompressed is @c false).
  * @exception KTX_INVALID_OPERATION
- *                    The texture's images are not in BCn format (i.e., either
- *                    color model is not set to BCn or This->vkFormat does not
- *                    correspond to the set BCn color model).
+ *                    The texture's images are not in BCn format.
  * @exception KTX_INVALID_OPERATION
  *                    The texture does not contain any data (i.e.,
  *                    @c This->pData is @c NULL and there is no pending data
@@ -117,8 +123,6 @@ extern "C" KTX_error_code
 ktxTexture2_DecodeBCn(ktxTexture2* This) {
     uint32_t* BDB = This->pDfd + 1;
     uint32_t channelId = KHR_DFDSVAL(BDB, 0, CHANNELID);
-    int nchannels;
-    VkFormat decompressedVkFormat;
     KTX_error_code result;
 
     if (This->supercompressionScheme == KTX_SS_BASIS_LZ ||
@@ -130,8 +134,18 @@ ktxTexture2_DecodeBCn(ktxTexture2* This) {
 
     if (!This->isCompressed) return KTX_INVALID_OPERATION;
 
-    ktx_bcn_compression_e bcn = get_bcn_compression_kind(static_cast<VkFormat>(This->vkFormat),
-                                                         decompressedVkFormat, nchannels);
+    const ktx_bcn_compression_e bcn =
+        get_bcn_compression_kind(static_cast<VkFormat>(This->vkFormat));
+    if (bcn == KTX_BCN_COMPRESSION_NONE) return KTX_INVALID_OPERATION;
+
+    // Is the color model correctly set? (i.e., color model corresponds to
+    // This->vkFormat). If not, then the given file doesn't align with the spec.
+    auto expectedModel = get_bcn_colormodel(bcn);
+    if ((khr_df_model_e)KHR_DFDVAL(BDB, MODEL) != expectedModel) return KTX_FILE_DATA_ERROR;
+
+    const VkFormat decompressedVkFormat = get_bcn_decompressed_format(
+        bcn, ktxTexture2_GetTransferFunction_e(This), static_cast<VkFormat>(This->vkFormat));
+    if (decompressedVkFormat == VK_FORMAT_UNDEFINED) return KTX_INVALID_OPERATION;
 
     if ((bcn == KTX_BCN_COMPRESSION_BC1 || bcn == KTX_BCN_COMPRESSION_BC1A) &&
         !(channelId == KHR_DF_CHANNEL_BC1A_COLOR || channelId == KHR_DF_CHANNEL_BC1A_ALPHA))
@@ -279,20 +293,21 @@ ktxUnpackBCn(const ktx_uint8_t* src_blocks, void* dst, ktx_size_t dstByteLength,
     // combinations (at least for LDR and not for BC6H formats).
     uint8_t rgba[4 * 4 * 4]; /* width * height * num channels = 64 bytes */
 
-    // Number of uint16_t elements to move from pixel x at some scanline to next
-    // pixel at x on the next scanline for an RGB HDR decoded block.
+    // Number of elements to move from pixel x at some scanline to pixel at x on
+    // the next scanline for an RGB HDR decoded block.
     const uint32_t rgbh_pitch = 4 * 3;
     uint16_t rgbh[4 * rgbh_pitch]; /* height * pitch = 48 uint16_t */
 
     uint8_t rgb[4 * 4 * 3]; /* only for BC1 */
 
-    const uint32_t nchannels = get_nchannels(bcn);
+    const uint32_t nchannels = get_bcn_nchannels(bcn);
 
     const bool is_hdr = (bcn == KTX_BCN_COMPRESSION_BC6HU) || (bcn == KTX_BCN_COMPRESSION_BC6HS);
 
     [[maybe_unused]] size_t nbr_written_bytes_total = 0;
     // Doing individual checks is a bit involved so just do an initial check
-    size_t expectedDstByteLength = width * height * nchannels * (is_hdr ? sizeof(uint16_t) : sizeof(uint8_t));
+    size_t expectedDstByteLength =
+        width * height * nchannels * (is_hdr ? sizeof(uint16_t) : sizeof(uint8_t));
     if (dstByteLength != expectedDstByteLength) return KTX_INVALID_VALUE;
 
     if (bcn == KTX_BCN_COMPRESSION_NONE) return KTX_INVALID_OPERATION;

@@ -1537,9 +1537,7 @@ void CommandCreate::processOptions(cxxopts::Options& opts, cxxopts::ParseResult&
     if (isBCn && !options.raw) {
         options.encodeBCn = true;
 
-        VkFormat decompressed_format;
-        int nchannels;
-        options.bcn = get_bcn_compression_kind(options.vkFormat, decompressed_format, nchannels);
+        options.bcn = get_bcn_compression_kind(options.vkFormat);
         if (options.bcn == KTX_BCN_COMPRESSION_NONE) {  // should never occur
           assert(false);
           fatal(rc::NOT_SUPPORTED, "{} is unsupported for BCn encoding.", toString(options.vkFormat));

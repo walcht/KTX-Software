@@ -47,6 +47,7 @@ template <class To, class From>
 int EXIT_CODE_ERROR = 2;
 int EXIT_CODE_MISMATCH = 1;
 int EXIT_CODE_MATCH = 0;
+float BASELINE_EPSILON = ((1.0f - 0.99951172f) * 10.0f);  // 1 minus largest float16 number less than 1
 
 template <typename... Args>
 void error(int return_code, fmt::format_string<Args...> fmt, Args&&... args) {
@@ -203,16 +204,20 @@ CompareResult compareUnorm16(const char* rawLhs, const char* rawRhs, std::size_t
 }
 
 
-CompareResult compareSFloat32(const char* rawLhs, const char* rawRhs, std::size_t rawSize, float tolerance) {
+CompareResult compareSFloat32(const char* rawLhs, const char* rawRhs, std::size_t rawSize,
+                              float tolerance, bool ignore_signed = false) {
     const auto* lhs = reinterpret_cast<const float*>(rawLhs);
     const auto* rhs = reinterpret_cast<const float*>(rawRhs);
     const auto element_size = sizeof(float);
     const auto count = rawSize / element_size;
+    const auto baseline = BASELINE_EPSILON * tolerance;
 
     for (std::size_t i = 0; i < count; ++i) {
         const auto diff = std::abs(lhs[i] - rhs[i]);
+        if (ignore_signed && (lhs[i] < 0 || rhs[i] < 0)) continue;
         const auto absMin = std::min(std::abs(lhs[i]), std::abs(rhs[i]));
-        if (diff > tolerance * absMin)
+        // Use a baseline so that if one of the values is 0, we don't get an instant failure.
+        if (diff > std::max(tolerance * absMin, baseline))
             return CompareResult{false, diff, i, i * element_size, lhs[i], rhs[i]};
     }
 
@@ -225,12 +230,12 @@ CompareResult compareSFloat32(const char* rawLhs, const char* rawRhs, std::size_
  * @brief Compare two half float (F16) data arrays.
  *
  * If an nan value is encountered in any of the two inputs the comparison for
- * that index is ignored. 
+ * that index is ignored.
  *
  * If an inf value is encountered in any of the two inputs the comparison for
  * that index is ignored.
  *
- * nan and inf values are ignored because HDR usually encoders do not even
+ * nan and inf values are ignored because usually HDR encoders do not even
  * accept nan/inf inputs and pre-processing has to clean them up (e.g., by
  * assigning nan/(+-)inf to 0 as is done in the case of BC6HU encoder).
  *
@@ -246,22 +251,20 @@ CompareResult compareSFloat16(const char* rawLhs, const char* rawRhs, std::size_
     const auto* rhs = reinterpret_cast<const uint16_t*>(rawRhs);
     const auto element_size = sizeof(uint16_t);
     const auto count = rawSize / element_size;
-    const auto baseline = (std::numeric_limits<float>::epsilon() * 100000) * tolerance;
+    const auto baseline = BASELINE_EPSILON * tolerance;
 
     for (std::size_t i = 0; i < count; ++i) {
         const auto lhsFloat = imageio::half_to_float(lhs[i]);
         const auto rhsFloat = imageio::half_to_float(rhs[i]);
-        if (ignore_signed && (lhsFloat < 0 || rhsFloat < 0))
-            continue;
-        if (std::isnan(lhsFloat) || std::isnan(rhsFloat))
-            continue;
-        if (std::isinf(lhsFloat) || std::isinf(rhsFloat))
-            continue;
+        if (ignore_signed && (lhsFloat < 0 || rhsFloat < 0)) continue;
+        if (std::isnan(lhsFloat) || std::isnan(rhsFloat)) continue;
+        if (std::isinf(lhsFloat) || std::isinf(rhsFloat)) continue;
         const auto diff = std::abs(lhsFloat - rhsFloat);
         const auto absMin = std::min(std::abs(lhsFloat), std::abs(rhsFloat));
-        // Some encoders don't encode 0 values as 0 but rather as a very small number (e.g., BC6HU encodes 0 into circa 1e-06).
-        // This is why a baseline is introduced so the difference doesn't have to be extremely small for 0 values or
-        // for very small values.
+        // Use a baseline so that if one of the values is 0, we don't get an instant failure.
+        // Also, some encoders don't encode 0 values as 0 but rather as a very small number
+        // (e.g., BC6HU encodes 0 into circa 1e-06). This is why a baseline is introduced so
+        // the difference doesn't have to be extremely small for very small values.
         if (diff > std::max(tolerance * absMin, baseline))
             return CompareResult{false, diff, i, i * element_size, lhsFloat, rhsFloat};
     }
@@ -481,17 +484,21 @@ int main(int argc, char* argv[]) {
     bool ignore_signed = false;
 
     cxxopts::Options opts("ktxdiff", "diff two KTX2 files");
-    opts.add_options()("expected-ktx2", "Expected KTX2 file", cxxopts::value<std::string>())(
-        "received-ktx2", "Received KTX2 file", cxxopts::value<std::string>())(
-        "tolerance,t",
-        "For normalized formats tolerance is the normalized absolute value of the acceptable "
-        "difference (inclusive). For unnormalized formats it is the fraction of the minimum of the "
-        "values being compared that is acceptable. Default is 0.05",
-        cxxopts::value<float>())("skip-kvd", "Ignore key-value metadata (KVD)")(
-        "ignore-signed,i",
-        "Ignore signed values when comparing. This is especially useful for BC6HU encoders since "
-        "these may cleanup the input by replacing negative values by 0. This currently only "
-        "applies to SFLOAT16 comparisons.")("help,h", "Show this help message and exit");
+    opts.add_options()
+      ("expected-ktx2", "Expected KTX2 file", cxxopts::value<std::string>())
+      ("received-ktx2", "Received KTX2 file", cxxopts::value<std::string>())
+      ("tolerance,t",
+        "For normalized formats, tolerance is the absolute value of the acceptable difference "
+        "(inclusive) between the two normalized values being compared. For unnormalized formats, "
+        "tolerance is the fraction of the minimum of the absolute values being compared that is "
+        "acceptable. For unnormalized formats, an epsilon baseline is used to avoid instant "
+        "failure when any of the values being compared is 0. Default is 0.05",
+        cxxopts::value<float>())
+      ("skip-kvd", "Ignore key-value metadata (KVD)")
+      ("ignore-signed,i", "Ignore signed values when comparing. This is "
+        "especially useful for BC6HU encoders since these may cleanup the "
+        "input by replacing negative values by 0. This currently only applies "
+        "to SFLOAT16 comparisons.")("help,h", "Show this help message and exit");
     opts.parse_positional({"expected-ktx2", "received-ktx2", "tolerance"});
     opts.positional_help("<expected-ktx2> <received-ktx2> [tolerance]");
     opts.show_positional_help();

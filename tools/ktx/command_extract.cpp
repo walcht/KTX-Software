@@ -9,18 +9,14 @@
 #include "formats.h"
 #include "fragment_uri.h"
 #include "sbufstream.h"
-#include "transcoder/basisu_transcoder_internal.h"
 #include "utility.h"
 #include "validate.h"
 #include "metadata_utils.h"
 #include "transcode_utils.h"
-#include "image.hpp"
 #include "ktx.h"
 #include <array>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <unordered_map>
 
 #include <cxxopts.hpp>
 #include <fmt/ostream.h>
@@ -169,8 +165,8 @@ public:
 private:
     void executeExtract();
     void saveRawFile(std::string filepath, bool appendExtension, const char* data, std::size_t size);
-    void saveImageFile(std::string filepath, bool appendExtension, const char* data,
-                       std::size_t size, VkFormat vkFormat, const FormatDescriptor& format,
+    void saveImageFile(std::string filepath, bool appendExtension, const char* data, std::size_t size,
+                       VkFormat vkFormat, khr_df_transfer_e tf, const FormatDescriptor& format,
                        uint32_t width, uint32_t height, float scale = 1.0, float offset = 0.0);
 
     void savePNG(std::string filepath, bool appendExtension, VkFormat vkFormat,
@@ -189,8 +185,8 @@ private:
                            float scale, float offset, const char* data, std::size_t size);
     void unpackAndSave422(std::string filepath, bool appendExtension, VkFormat vkFormat, const FormatDescriptor& format, uint32_t width, uint32_t height, const char* data, std::size_t size);
     void decodeAndSaveBCn(std::string filepath, bool appendExtension, VkFormat vkFormat,
-                          uint32_t width, uint32_t height, const char* compressedData,
-                          std::size_t compressedSize);
+                          khr_df_transfer_e tf, uint32_t width, uint32_t height,
+                          const char* compressedData, std::size_t compressedSize);
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -499,8 +495,8 @@ void CommandExtract::executeExtract() {
                         saveRawFile(outputFilepath, isMultiOutput, depthSliceData, imageSize);
                     } else {
                         saveImageFile(outputFilepath, isMultiOutput, depthSliceData, imageSize,
-                                static_cast<VkFormat>(texture->vkFormat), format,
-                                imageWidth, imageHeight, scale, offset);
+                                      static_cast<VkFormat>(texture->vkFormat), ktxTexture2_GetTransferFunction_e(texture),
+                                      format, imageWidth, imageHeight, scale, offset);
                     }
                 }
             }
@@ -593,20 +589,22 @@ void CommandExtract::decodeAndSaveASTC(std::string filepath, bool appendExtensio
             reinterpret_cast<const char*>(uncompressedBuffer.get()),
             uncompressedSize,
             uncompressedVkFormat,
+            KHR_DF_TRANSFER_UNSPECIFIED,  // is not used for ASTC
             createFormatDescriptor(uncompressedVkFormat, *this),
             width,
             height);
 }
 
 void CommandExtract::decodeAndSaveBCn(std::string filepath, bool appendExtension, VkFormat vkFormat,
-                                      uint32_t width, uint32_t height, const char* compressedData,
+                                      khr_df_transfer_e tf, uint32_t width, uint32_t height,
+                                      const char* compressedData,
                                       std::size_t compressedDataByteLength) {
-    int nchannels;
     size_t expectedCompressedDataByteLength;
     const size_t nBlocks = (std::size_t)((width + 3) / 4) * ((height + 3) / 4);
 
-    VkFormat decompressed_format;
-    ktx_bcn_compression_e bcn = get_bcn_compression_kind(vkFormat, decompressed_format, nchannels);
+    const ktx_bcn_compression_e bcn = get_bcn_compression_kind(vkFormat);
+    const uint32_t nchannels = get_bcn_nchannels(bcn);
+    const VkFormat decompressed_format = get_bcn_decompressed_format(bcn, tf, vkFormat);
 
     bool is_hdr = (bcn == KTX_BCN_COMPRESSION_BC6HU || bcn == KTX_BCN_COMPRESSION_BC6HS);
 
@@ -661,7 +659,7 @@ void CommandExtract::decodeAndSaveBCn(std::string filepath, bool appendExtension
 
     saveImageFile(std::move(filepath), appendExtension,
                   reinterpret_cast<const char*>(decompressed_buffer.get()), decompressed_size,
-                  decompressed_format, createFormatDescriptor(decompressed_format, *this), width,
+                  decompressed_format, tf, createFormatDescriptor(decompressed_format, *this), width,
                   height);
 }
 
@@ -1222,7 +1220,7 @@ void CommandExtract::saveEXR(std::string filepath, bool appendExtension,
 void CommandExtract::saveImageFile(
         std::string filepath, bool appendExtension,
         const char* data, std::size_t size,
-        VkFormat vkFormat, const FormatDescriptor& format, uint32_t width, uint32_t height,
+        VkFormat vkFormat, khr_df_transfer_e tf, const FormatDescriptor& format, uint32_t width, uint32_t height,
         float scale, float offset) {
 
     switch (vkFormat) {
@@ -1474,7 +1472,7 @@ void CommandExtract::saveImageFile(
     case VK_FORMAT_BC7_UNORM_BLOCK: [[fallthrough]];
     case VK_FORMAT_BC7_SRGB_BLOCK:
         // BCn decode will recurse into this function with the uncompressed data and format
-        decodeAndSaveBCn(std::move(filepath), appendExtension, vkFormat, width, height, data, size);
+        decodeAndSaveBCn(std::move(filepath), appendExtension, vkFormat, tf, width, height, data, size);
         break;
 
     default:

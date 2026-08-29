@@ -364,9 +364,7 @@ void CommandEncode::executeEncode() {
     } else if (options.vkFormat != VK_FORMAT_UNDEFINED && options.encodeBCn) {
         // Encode to BCn
         // First we have to set the target BCn target format in options
-        int nchannels;
-        VkFormat decompressed_format;
-        options.bcn = get_bcn_compression_kind(options.vkFormat, decompressed_format, nchannels);
+        options.bcn = get_bcn_compression_kind(options.vkFormat);
         if (options.bcn == KTX_BCN_COMPRESSION_NONE) {  // should never occur
           assert(false);
           fatal(rc::IO_FAILURE, "Failed to encode KTX2 file to BCn. Target format is not a supported BCn format {}",
