@@ -92,8 +92,3 @@ jobs:
       with:
         name: cts_failure_artifacts_${{ github.sha }}
         path: tests/cts/clitests/output
-
-    - name: Upload test log on failure
-      if: ${{ failure() }}
-      shell: pwsh
-      run: scripts/on_failure.ps1
