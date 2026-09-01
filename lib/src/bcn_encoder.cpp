@@ -1019,7 +1019,7 @@ clean_hdr_image(uint16_t* src_rgb16, uint32_t width, uint32_t height, uint32_t s
  */
 static KTX_error_code
 postprocess_rdo_bcn(const uint8_t* unpacked_img, size_t unpacked_img_size, uint8_t* packed_img,
-                    size_t packed_img_size, rdo_params params, ktx_bcn_compression_e bcn,
+                    size_t packed_img_size, rdo_params params, ktx_bcn_compression bcn,
                     uint32_t width, uint32_t height, uint32_t threads) {
 #define CHECK_SIZES(nchannels, block_size)                               \
     do {                                                                 \

@@ -1438,42 +1438,43 @@ typedef ktx_uint32_t ktx_pack_bcn_quality_levels;
  * @brief BCn compression kind.
  */
 typedef enum ktx_bcn_compression_e {
-    KTX_BCN_COMPRESSION_NONE    = 0,
+    KTX_BCN_COMPRESSION_NONE    = 0u,
         /*!< NONE. */
-    KTX_BCN_COMPRESSION_BC1     = 1,
+    KTX_BCN_COMPRESSION_BC1     = 1u,
         /*!< BC1 compression (RGB). Encodes a 4x4 RGB LDR block into 8 bytes. */
-    KTX_BCN_COMPRESSION_BC1A    = 2,
+    KTX_BCN_COMPRESSION_BC1A    = 2u,
         /*!< BC1 compression. Encodes a 4x4 RGBA LDR block into 8 bytes.
            Alpha is encoded just using 1 bit (i.e., fully opaque or fully
            transparent).
          */
-    KTX_BCN_COMPRESSION_BC2     = 3,
+    KTX_BCN_COMPRESSION_BC2     = 3u,
         /*!< BC2 compression. Encodes a 4x4 RGBA LDR block into 16 bytes.
            RGB block is encoded using BC1 into 8 bytes. Alpha is encoded into
            8 bytes by directly storing the 16 alpha values into 8 bytes (i.e.,
            each alpha value is stored using just 4 bits).
          */
-    KTX_BCN_COMPRESSION_BC3     = 4,
+    KTX_BCN_COMPRESSION_BC3     = 4u,
         /*!< BC3 compression. Encodes a 4x4 RGBA LDR block into 16 bytes.
            RGB block is encoded using BC1 into 8 bytes. Alpha is encoded
            into 8 bytes using two reference alpha points and 16 3-bit alpha
            indices for interpolation.
          */
-    KTX_BCN_COMPRESSION_BC4     = 5,
+    KTX_BCN_COMPRESSION_BC4     = 5u,
         /*!< BC4 compression. Encodes a 4x4 R LDR block into 8 bytes. */
-    KTX_BCN_COMPRESSION_BC5     = 6,
+    KTX_BCN_COMPRESSION_BC5     = 6u,
         /*!< BC5 compression. Encodes a 4x4 RG LDR block into 16 bytes.
            Each channel is encoded separately (ideal for 2-channel, non-color
            data. E.g., normal maps). */
-    KTX_BCN_COMPRESSION_BC6HU   = 7,
+    KTX_BCN_COMPRESSION_BC6HU   = 7u,
         /*!< BC6HU compression. Encodes a 4x4 RGB HDR unsigned block into
            16 bytes. */
-    KTX_BCN_COMPRESSION_BC6HS   = 8,
+    KTX_BCN_COMPRESSION_BC6HS   = 8u,
         /*!< BC6HS compression. Encodes a 4x4 RGB HDR signed block into
            16 bytes. */
-    KTX_BCN_COMPRESSION_BC7     = 9,
+    KTX_BCN_COMPRESSION_BC7     = 9u,
         /*!< BC7 compression. Encodes a 4x4 RGBA LDR block into 16 bytes. */
 } ktx_bcn_compression_e;
+typedef ktx_uint32_t ktx_bcn_compression;
 
 /**
  * @memberof ktxTexture
@@ -1508,9 +1509,9 @@ typedef struct ktxBCnParams {
            RDO). Default is 1.
          */
 
-    ktx_bcn_compression_e bcn;
-        /*!< BCn format to compress to. Only options related to the provided
-           target BCn format are used.
+    ktx_bcn_compression bcn;
+        /*!< BCn format to compress the uncompressed images to. Only options
+           related to the provided target BCn format are used.
 
            Since BC7 encoding is performed using basisu's analytical encoder
            which encodes so rapidly (on average), that apart from lower VRAM
@@ -1531,8 +1532,7 @@ typedef struct ktxBCnParams {
            value.
 
            For BC1, BC2, and BC3, this maps to the range [0, 19].
-           For BC7, this maps to an OR'ed set of lower-level flags which can
-           also be set directly for advanced use-cases.
+           For BC7, this maps to an OR'ed set of low-level flags.
          */
 
     /* RDO params */
@@ -1554,10 +1554,10 @@ typedef struct ktxBCnParams {
          */
 
     ktx_uint32_t bcnRDODictSize;
-        /*!< The number of bytes the encoder can look back from each block to
-           find matches. The larger this value, the slower the encoder but the
-           higher the quality per LZ compressed bit. Range is [64,65536].
-           Default is 4096.
+        /*!< The number of bytes up to which the encoder can look back to from
+           each block to find matches. The larger this value, the slower the
+           encoder but the higher the quality per LZ compressed bit.
+           Range is [64,65536]. Default is 4096.
          */
 
     float bcnRDOMaxSmoothBlockErrorScale;
