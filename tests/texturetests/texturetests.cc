@@ -3481,9 +3481,20 @@ class ktxTexture2BCnEncodeDecodeTestBase
             break;
 
           case KTX_BCN_COMPRESSION_BC1A:
-          case KTX_BCN_COMPRESSION_BC2:
           case KTX_BCN_COMPRESSION_BC6HS:
             ASSERT_TRUE(false);
+            break;
+          }
+
+          case KTX_BCN_COMPRESSION_BC2: {
+            original = tmpDir / format("encode_rgba8_{}_to_bc2{}_then_decode_original.ktx2", srgb_str, rdo_str);
+            decoded = tmpDir / format("encode_rgba8_{}_to_bc2{}_then_decode_decoded.ktx2", srgb_str, rdo_str);
+            expectedModel = KHR_DF_MODEL_BC2;
+            if (is_srgb) {
+              compressedFormat = VK_FORMAT_BC2_SRGB_BLOCK;
+            } else {
+              compressedFormat = VK_FORMAT_BC2_UNORM_BLOCK;
+            }
             break;
           }
 
@@ -3686,12 +3697,13 @@ TEST_F(ktxTexture2_BCnEncodeDecodeTestRGB8_UNORM, encode_rgb8_unorm_to_bc1_rdo_t
 TEST_F(ktxTexture2_BCnEncodeDecodeTestRGB8_SRGB, encode_rgb8_srgb_to_bc1_then_decode) { runTest(KTX_BCN_COMPRESSION_BC1, false); }
 TEST_F(ktxTexture2_BCnEncodeDecodeTestRGB8_SRGB, encode_rgb8_srgb_to_bc1_rdo_then_decode) { runTest(KTX_BCN_COMPRESSION_BC1, true); }
 
-// TODO: add encode-then-decode test for BC2 once BC2 encoder is implemented
 // BC2:
 //    - VK_FORMAT_R8G8B8A8_UNORM
 //    - VK_FORMAT_R8G8B8A8_SRGB
-// TEST_F(ktxTexture2_BCnEncodeDecodeTestRGBA8_UNORM, encode_rgba8_unorm_to_bc2_then_decode) { runTest(KTX_BCN_COMPRESSION_BC2); }
-// TEST_F(ktxTexture2_BCnEncodeDecodeTestRGBA8_SRGB, encode_rgba8_srgb_to_bc2_then_decode) { runTest(KTX_BCN_COMPRESSION_BC2); }
+TEST_F(ktxTexture2_BCnEncodeDecodeTestRGBA8_UNORM, encode_rgba8_unorm_to_bc2_then_decode) { runTest(KTX_BCN_COMPRESSION_BC2, false); }
+TEST_F(ktxTexture2_BCnEncodeDecodeTestRGBA8_UNORM, encode_rgba8_unorm_to_bc2_rdo_then_decode) { runTest(KTX_BCN_COMPRESSION_BC2, true); }
+TEST_F(ktxTexture2_BCnEncodeDecodeTestRGBA8_SRGB, encode_rgba8_srgb_to_bc2_then_decode) { runTest(KTX_BCN_COMPRESSION_BC2, false); }
+TEST_F(ktxTexture2_BCnEncodeDecodeTestRGBA8_SRGB, encode_rgba8_srgb_to_bc2_rdo_then_decode) { runTest(KTX_BCN_COMPRESSION_BC2, true); }
 
 // BC3:
 //    - VK_FORMAT_R8G8B8_UNORM
@@ -3900,8 +3912,10 @@ TEST_F(ktxTexture2BCnDecodeTestBase, decode_rgb8_srgb_bc1_rdo_zstd) { runTest(u8
 // BC2:
 //  - VK_FORMAT_R8G8B8A8_UNORM
 //  - VK_FORMAT_R8G8B8A8_SRGB (TODO)
-// TODO: add BC2 RDO when BC2 encoder is implemented
 TEST_F(ktxTexture2BCnDecodeTestBase, decode_rgba8_unorm_bc2) { runTest(u8"rgba8_unorm_bc2.ktx2", u8"rgba8_unorm_input_for_bc2.ktx2"); }
+TEST_F(ktxTexture2BCnDecodeTestBase, decode_rgba8_srgb_bc2) { runTest(u8"rgba8_srgb_bc2.ktx2", u8"rgba8_srgb_input_for_bc2.ktx2"); }
+TEST_F(ktxTexture2BCnDecodeTestBase, decode_rgba8_srgb_bc2_rdo_zlib) { runTest(u8"rgba8_srgb_bc2_rdo_zlib.ktx2", u8"rgba8_srgb_input_for_bc2.ktx2"); }
+TEST_F(ktxTexture2BCnDecodeTestBase, decode_rgba8_srgb_bc2_rdo_zstd) { runTest(u8"rgba8_srgb_bc2_rdo_zstd.ktx2", u8"rgba8_srgb_input_for_bc2.ktx2"); }
 
 // BC3:
 //    - VK_FORMAT_R8G8B8_UNORM

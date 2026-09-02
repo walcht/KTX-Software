@@ -48,7 +48,7 @@ Encode a KTX2 file.
     For universal and ASTC LDR formats, the input file must be R8, R8G8, R8G8B8
     or R8G8B8A8 (or their sRGB variants).
 
-    For BC1, BC3 and BC7 formats, the input file must be R8G8B8A8 (or their SRGB variants).
+    For BC1, BC2, BC3 and BC7 formats, the input file must be R8G8B8A8 (or their SRGB variants).
     For BC4 format, the input file must be R8.
     For BC5 format, the input file must be R8G8.
 
@@ -274,8 +274,9 @@ void CommandEncode::executeEncode() {
 
     const auto is_hdr = ktxTexture2_IsHDR(texture);
 
-    if (model == KHR_DF_MODEL_BC1A || model == KHR_DF_MODEL_BC3 || model == KHR_DF_MODEL_BC4 ||
-         model == KHR_DF_MODEL_BC5 || model == KHR_DF_MODEL_BC6H || model == KHR_DF_MODEL_BC7)
+    if (model == KHR_DF_MODEL_BC1A || model == KHR_DF_MODEL_BC2 || model == KHR_DF_MODEL_BC3 ||
+        model == KHR_DF_MODEL_BC4 || model == KHR_DF_MODEL_BC5 || model == KHR_DF_MODEL_BC6H ||
+        model == KHR_DF_MODEL_BC7)
     {
       // Can't directly encode from BCn to BCn
       if (options.encodeBCn)
@@ -372,8 +373,6 @@ void CommandEncode::executeEncode() {
         }
         else if (options.bcn == KTX_BCN_COMPRESSION_BC1A)
           fatal(rc::IO_FAILURE, "Punch-through alpha encoding for BC1 format is not supported. Consider supplying an RGB8 input format instead.");
-        else if (options.bcn == KTX_BCN_COMPRESSION_BC2)
-          fatal(rc::IO_FAILURE, "Encoding to BC2 format is not supported (yet).");
         else if (options.bcn == KTX_BCN_COMPRESSION_BC6HS)
           fatal(rc::IO_FAILURE, "Encoding to signed BC6H HDR format (BC6HS) is not supported.");
 

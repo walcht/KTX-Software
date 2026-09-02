@@ -2883,6 +2883,17 @@ namespace rgbcx
 		return best_err;
 	}
 
+  void encode_bc2(uint32_t level, void* pDst, const uint8_t* pPixels)
+  {
+		assert(g_initialized);
+
+    auto pDst_alpha = reinterpret_cast<uint64_t*>(pDst);
+    *pDst_alpha = 0l;
+    for (int i = 0; i < 16; ++i)
+      *pDst_alpha |= static_cast<uint64_t>(pPixels[3 + i * 4] / 17) << (i * 4);
+		encode_bc1(level, static_cast<uint8_t*>(pDst) + 8, pPixels, false, false);
+  }
+
 	void encode_bc3(void* pDst, const uint8_t* pPixels, uint32_t flags, uint32_t total_orderings_to_try)
 	{
 		assert(g_initialized);
@@ -3055,23 +3066,24 @@ namespace rgbcx
 		}
 	}
 
+
+	void unpack_sharp_alpha(const void* pBlock_bits, uint8_t* pPixels, uint32_t stride)
+  {
+    auto alpha_block = *reinterpret_cast<const uint64_t*>(pBlock_bits);
+    for (int i = 0; i < 16; ++i)
+        pPixels[i * stride] = ((alpha_block >> (4 * i)) & 0x0F) * 17;
+  }
+
   bool unpack_bc2(const void* pBlock_bits, void* pPixels, bc1_approx_mode mode)
   {
 		color32* pDst_pixels = static_cast<color32*>(pPixels);
     auto pBlock = static_cast<const uint8_t*>(pBlock_bits);
-
 		bool success = true;
-
     // unpack BC1-encoded block (8 bytes)
 		if (unpack_bc1(pBlock + 8, pDst_pixels, true, mode))
 			success = false;
-
     // then unpack sharp alpha block (8 bytes - 4 x uint16_t)
-    auto pAlpha = reinterpret_cast<const uint16_t*>(pBlock);
-    for (int i = 0; i < 4; ++i)
-      for (int j = 0; j < 4; ++j)
-        pDst_pixels[j + i * 4].a = ((pAlpha[i] >> (4 * j)) & 0x0F) * 17;
-
+    unpack_sharp_alpha(pBlock, &pDst_pixels[0].a, 4);
 		return success;
   }
 

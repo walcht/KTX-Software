@@ -1,22 +1,36 @@
 # Copyright 2019-2020 The Khronos Group Inc.
 # SPDX-License-Identifier: Apache-2.0
 
-add_library(bc7enc_rdo)
-target_compile_features(bc7enc_rdo PUBLIC cxx_std_17)
+cmake_minimum_required(VERSION 3.20)
+project(bc7enc_rdo)
+
+add_library(rgbcx
+    ${CMAKE_CURRENT_LIST_DIR}/rgbcx.cpp     # BC1, BC3, BC4 and BC5 encoders/decoders
+)
+
+add_library(ert
+    ${CMAKE_CURRENT_LIST_DIR}/ert.cpp       # RDO post processing step and some utils
+)
+
+target_compile_features(rgbcx PUBLIC cxx_std_17)
+target_compile_features(ert PUBLIC cxx_std_17)
 
 # original bc7enc_rdo disables strict aliasing (see https://github.com/richgel999/bc7enc_rdo/blob/master/CMakeLists.txt)
 # basisu also emphasises on compiling with '-fno-strict-aliasing'
 if (NOT MSVC)
-  target_compile_options(bc7enc_rdo PRIVATE -fno-strict-aliasing)
+  target_compile_options(rgbcx PRIVATE -fno-strict-aliasing)
+  target_compile_options(ert PRIVATE -fno-strict-aliasing)
 endif()
 
-target_sources(bc7enc_rdo
-  PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/rgbcx.cpp     # BC1, BC3, BC4 and BC5 encoders/decoders
-    ${CMAKE_CURRENT_LIST_DIR}/ert.cpp       # RDO post processing step and some utils
-)
-
-target_include_directories(bc7enc_rdo
+target_include_directories(rgbcx
   PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/
 )
+
+target_include_directories(ert
+  PUBLIC
+    ${CMAKE_CURRENT_LIST_DIR}/
+)
+
+add_library(bc7enc_rdo::rgbcx ALIAS rgbcx)
+add_library(bc7enc_rdo::ert ALIAS ert)

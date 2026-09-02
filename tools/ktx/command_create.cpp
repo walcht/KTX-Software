@@ -585,6 +585,8 @@ struct OptionsCreate {
                 VK_FORMAT_BC1_RGB_SRGB_BLOCK,
                 VK_FORMAT_BC1_RGBA_UNORM_BLOCK,
                 VK_FORMAT_BC1_RGBA_SRGB_BLOCK,
+                VK_FORMAT_BC2_UNORM_BLOCK,
+                VK_FORMAT_BC2_SRGB_BLOCK,
                 VK_FORMAT_BC3_UNORM_BLOCK,
                 VK_FORMAT_BC3_SRGB_BLOCK,
                 VK_FORMAT_BC4_UNORM_BLOCK,
@@ -1544,8 +1546,6 @@ void CommandCreate::processOptions(cxxopts::Options& opts, cxxopts::ParseResult&
         }
         else if (options.bcn == KTX_BCN_COMPRESSION_BC1A)
           fatal(rc::IO_FAILURE, "Punch-through alpha encoding for BC1 format is not supported. Consider supplying an RGB8 input format instead.");
-        else if (options.bcn == KTX_BCN_COMPRESSION_BC2)
-          fatal(rc::IO_FAILURE, "Encoding to BC2 format is not supported (yet).");
         else if (options.bcn == KTX_BCN_COMPRESSION_BC6HS)
           fatal(rc::IO_FAILURE, "Encoding to signed BC6H HDR format (BC6HS) is not supported.");
     }

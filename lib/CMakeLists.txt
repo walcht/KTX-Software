@@ -724,10 +724,12 @@ add_subdirectory(${KTX_ROOT_DIR}/external/bc7enc_rdo bc7enc_rdo)
 set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_RESET})
 
 if (LIBKTX_VERSION_FULL)
-    add_lib_dependencies(ktx bc7enc_rdo)
+    add_lib_dependencies(ktx bc7enc_rdo::rgbcx)
+    add_lib_dependencies(ktx bc7enc_rdo::ert)
 endif()
 if(LIBKTX_VERSION_READ_ONLY)
-    add_lib_dependencies(ktx_read bc7enc_rdo)
+    add_lib_dependencies(ktx_read bc7enc_rdo::rgbcx)
+    add_lib_dependencies(ktx_read bc7enc_rdo::ert)
 endif()
 
 

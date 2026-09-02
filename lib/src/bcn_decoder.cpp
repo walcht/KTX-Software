@@ -268,12 +268,13 @@ ktxTexture2_DecodeBCn(ktxTexture2* This) {
  * @param [in] dst              pointer to where to write the decoded image.
  *                              Should be able to hold the size of the
  *                              corresponding decompressed vkFormat.
+ * @param [in] dstByteLength    allocated destination byte length. Used for
+ *                              safety check before attemping to write
+ *                              to @p dst pointer.
  * @param [in] width            current image's width.
  * @param [in] height           current image's height.
  * @param [in] bcn              which BCn compression kind the provided image is
  *                              encoded in.
- * @param [in] bc1_approx_mode  BC1 approximation mode that is passed to BC1/BC3
- *                              block unpackers.
  *
  * @return                      KTX_SUCCESS on success, other KTX_* enum values
  *                              on error.

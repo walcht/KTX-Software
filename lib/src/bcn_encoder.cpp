@@ -15,14 +15,13 @@
  *
  * An optional RDO post-processing step can be enabled to significantly (circa
  * 50% or more) reduce bit rate when supercompressed with Deflate (Zlib or
- * ZSTD). Currently supported BCn formats are: BC1, BC3, BC4, BC5, BC6HU*, and
+ * ZSTD).
+ *
+ * Currently supported BCn formats are: BC1, BC2, BC3, BC4, BC5, BC6HU*, and
  * BC7.
  *
  * *: support for BC6HS is not yet implemented because basisu's encoder
  * currently fails when given signed half float values.
- *
- * BC2 (RGB+A) encoder is not implemented because it's rarely used in practice
- * due to poor quality alpha encoding. BC3 is almost always used instead.
  *
  * @author Walid Chtioui, independent contributor (walid.chtioui.main@gmail.com)
  */
@@ -123,41 +122,42 @@ struct rdo_bc1_workload {
     }
 };
 
-struct rdo_bc3_workload {
+struct rdo_bc2_or_bc3_workload {
     uint32_t m_width;
     uint32_t m_height;
     /* [in,out] packed/encoded image blocks */
     uint8_t* m_packed_img;
     /* [in,out] BC1 RGBX unpacked/decoded blocks (x == ignored) */
     const ert::color_rgba* m_unpacked_img_rgbx;
-    /* [in,out] BC4 AXXX unpacked/decoded blocks (x == ignored) */
+    /* [in,out] BC4/BC2 AXXX unpacked/decoded blocks (x == ignored) */
     const ert::color_rgba* m_unpacked_img_axxx;
     /* [in] BC1 RGB blocks entropy reduction params */
     ert::reduce_entropy_params m_ert_p_rgb;
-    /* [in] BC4 A blocks entropy reduction params */
+    /* [in] BC4/BC2 A blocks entropy reduction params */
     ert::reduce_entropy_params m_ert_p_a;
     /* [out] BC1 total number smooth RGB blocks */
     std::atomic_int32_t m_total_smooth_blocks_rgb;
-    /* [out] BC4 total number smooth A blocks */
+    /* [out] BC4/BC2 total number smooth A blocks */
     std::atomic_int32_t m_total_smooth_blocks_a;
     /* [out] BC1 total number second matches for RGB blocks */
     std::atomic_int32_t m_total_second_matches_rgb;
-    /* [out] BC4 total number second matches for A blocks */
+    /* [out] BC4/BC2 total number second matches for A blocks */
     std::atomic_int32_t m_total_second_matches_a;
     /* [out] BC1 total number total number modified packed/encoded RGB blocks */
     std::atomic_int32_t m_total_modified_rgb;
-    /* [out] BC4 total number total number modified packed/encoded A blocks */
+    /* [out] BC4/BC2 total number total number modified packed/encoded A blocks */
     std::atomic_int32_t m_total_modified_a;
     /* [out] false if any thread fails */
     bool m_success;
     const float* m_block_rgb_mse_scales;
 
-    rdo_bc3_workload() = delete;
-    rdo_bc3_workload(uint32_t width, uint32_t height, uint8_t* packed_img,
-                     const ert::color_rgba* unpacked_img_rgbx,
-                     const ert::color_rgba* unpacked_img_axxx, ert::reduce_entropy_params ert_p_rgb,
-                     ert::reduce_entropy_params ert_p_a,
-                     const float* block_rgb_mse_scales = nullptr)
+    rdo_bc2_or_bc3_workload() = delete;
+    rdo_bc2_or_bc3_workload(uint32_t width, uint32_t height, uint8_t* packed_img,
+                            const ert::color_rgba* unpacked_img_rgbx,
+                            const ert::color_rgba* unpacked_img_axxx,
+                            ert::reduce_entropy_params ert_p_rgb,
+                            ert::reduce_entropy_params ert_p_a,
+                            const float* block_rgb_mse_scales = nullptr)
         : m_width{width},
           m_height{height},
           m_packed_img{packed_img},
@@ -350,6 +350,15 @@ unpack_block_bc4(const void* pBlock, ert::color_rgba* pPixels, uint32_t, void*) 
 };
 
 static bool
+unpack_sharp_alpha_block(const void* pBlock, ert::color_rgba* pPixels, uint32_t, void*) {
+    uint8_t p_src_pixels[4 * 4 * 4];
+    memset(p_src_pixels, 0, sizeof(p_src_pixels));
+    rgbcx::unpack_sharp_alpha(pBlock, p_src_pixels, BC2_NCHANNELS);
+    memcpy(pPixels, p_src_pixels, 4 * 4 * 4);
+    return true;
+};
+
+static bool
 unpack_block_bc7(const void* pBlock, ert::color_rgba* pPixels, uint32_t, void*) {
     // Q. Why not pass reinterpret_cast<basist::color_rgba*>(pPixels) directly?
     // A. basist::color_rgba and ert::color_rgba although similar, are in
@@ -456,6 +465,14 @@ compression_workload_runner(int thread_count, int thread_id, void* payload) {
                               rgbx, true, false);
             break;
 
+        case KTX_BCN_COMPRESSION_BC2:
+            // BC2: 4 x 4 x 4 = 64 bytes -> 16 bytes
+            // Alpha channel is directly encoded using 4 bits (no endpoints interpolation like BC3)
+            rgbcx::encode_bc2(get_bc1_compression_quality(workload->params.bcnCompressionQuality),
+                              pDstLevelImage + (yBlock * num_blocks_x + xBlock) * BC2_BLOCK_SIZE,
+                              rgba);
+            break;
+
         case KTX_BCN_COMPRESSION_BC3:
             // BC3: 4 x 4 x 4 = 64 bytes -> 16 bytes
             rgbcx::encode_bc3(get_bc1_compression_quality(workload->params.bcnCompressionQuality),
@@ -533,12 +550,52 @@ rdo_bc1_workload_runner(int thread_count, int thread_id, void* payload) {
 }
 
 static void
+rdo_bc2_workload_runner(int thread_count, int thread_id, void* payload) {
+    uint32_t block_start_idx, num_blocks;
+    uint32_t total_modified_local_rgb = 0;
+    uint32_t total_modified_local_a = 0;
+    ert::reduce_entropy_stats local_stats;
+    auto workload = reinterpret_cast<rdo_bc2_or_bc3_workload*>(payload);
+    get_current_thread_blocks(workload->m_width, workload->m_height, thread_id, thread_count,
+                              block_start_idx, num_blocks);
+    // First, RDO the BC2 sharp Alpha channel blocks ...
+    bool res = ert::reduce_entropy(workload->m_packed_img + block_start_idx * BC2_BLOCK_SIZE,
+                                   num_blocks, BC2_BLOCK_SIZE, 8 /* BC2 alpha block size */, 4, 4,
+                                   1, workload->m_unpacked_img_axxx + block_start_idx * (4 * 4),
+                                   workload->m_ert_p_a, total_modified_local_a,
+                                   unpack_sharp_alpha_block, nullptr, local_stats);
+    if (res) {
+        workload->m_total_modified_a += total_modified_local_a;
+        workload->m_total_smooth_blocks_a += local_stats.total_smooth_blocks;
+        workload->m_total_second_matches_a += local_stats.total_second_matches;
+    } else {
+        workload->m_success = false;
+    }
+    // Then reduce entropy for the BC1 RGB block ...
+    res = ert::reduce_entropy(
+        (workload->m_packed_img + 8) + block_start_idx * BC2_BLOCK_SIZE, num_blocks, BC2_BLOCK_SIZE,
+        BC1_BLOCK_SIZE, 4, 4, 3, workload->m_unpacked_img_rgbx + block_start_idx * (4 * 4),
+        workload->m_ert_p_rgb, total_modified_local_rgb, unpack_block_bc1, nullptr, local_stats,
+        workload->m_block_rgb_mse_scales != nullptr
+            ? workload->m_block_rgb_mse_scales + block_start_idx
+            : nullptr);
+    if (res) {
+        workload->m_total_modified_rgb += total_modified_local_rgb;
+        workload->m_total_smooth_blocks_rgb += local_stats.total_smooth_blocks;
+        workload->m_total_second_matches_rgb += local_stats.total_second_matches;
+    } else {
+        workload->m_success = false;
+        return;
+    }
+}
+
+static void
 rdo_bc3_workload_runner(int thread_count, int thread_id, void* payload) {
     uint32_t block_start_idx, num_blocks;
     uint32_t total_modified_local_rgb = 0;
     uint32_t total_modified_local_a = 0;
     ert::reduce_entropy_stats local_stats;
-    auto workload = reinterpret_cast<rdo_bc3_workload*>(payload);
+    auto workload = reinterpret_cast<rdo_bc2_or_bc3_workload*>(payload);
     get_current_thread_blocks(workload->m_width, workload->m_height, thread_id, thread_count,
                               block_start_idx, num_blocks);
     // In bc7enc_rdo's code and after confirmed testing: BC4 A then BC1 RGB blocks.
@@ -980,8 +1037,7 @@ clean_hdr_image(uint16_t* src_rgb16, uint32_t width, uint32_t height, uint32_t s
  *
  * RDO is performed to reduce entropy for a potential subsequent Deflate step
  * (i.e., significant bit rate reduction can be achieved when further
- * supercompressed with Zlib/ZSTD). BC2 and BC6H formats are currently not
- * supported.
+ * supercompressed with Zlib/ZSTD). BC6H format is currently not supported.
  *
  * Some values of the reduce_entropy_params struct may be adjusted before being
  * passed to the underlying RDO subroutine. The reason for this is that,
@@ -1106,8 +1162,12 @@ postprocess_rdo_bcn(const uint8_t* unpacked_img, size_t unpacked_img_size, uint8
         break;
     }  // BC1
 
+    case KTX_BCN_COMPRESSION_BC2:
     case KTX_BCN_COMPRESSION_BC3: {
-        CHECK_SIZES(BC3_NCHANNELS, BC3_BLOCK_SIZE);
+        if (bcn == KTX_BCN_COMPRESSION_BC2)
+            CHECK_SIZES(BC2_NCHANNELS, BC2_BLOCK_SIZE);
+        else  // KTX_BCN_COMPRESSION_BC3
+            CHECK_SIZES(BC3_NCHANNELS, BC3_BLOCK_SIZE);
 
         ert_p.m_color_weights[3] = 0;
 
@@ -1124,9 +1184,9 @@ postprocess_rdo_bcn(const uint8_t* unpacked_img, size_t unpacked_img_size, uint8
         }
 
         if (params.ultra_smooth_block_mse_handling)
-            block_rgb_mse_scales =
-                compute_block_rgb_mse_scales(unpacked_img, width, height, BC3_NCHANNELS,
-                                             ert_p.m_smooth_block_max_mse_scale, ert_p.m_lambda);
+            block_rgb_mse_scales = compute_block_rgb_mse_scales(
+                unpacked_img, width, height, BC3_NCHANNELS /* == BC2_NCHANNELS */,
+                ert_p.m_smooth_block_max_mse_scale, ert_p.m_lambda);
 
         std::vector<ert::color_rgba> block_pixels_rgbx(nBlocksTotal * 4 * 4);
         std::vector<ert::color_rgba> block_pixels_axxx(block_pixels_rgbx.size());
@@ -1158,12 +1218,21 @@ postprocess_rdo_bcn(const uint8_t* unpacked_img, size_t unpacked_img_size, uint8
         auto start = std::chrono::high_resolution_clock::now();
 #endif
 
-        rdo_bc3_workload workload(
-            width, height, packed_img, block_pixels_rgbx.data(), block_pixels_axxx.data(), ert_p,
-            ert_p_a,
-            params.ultra_smooth_block_mse_handling ? block_rgb_mse_scales.data() : nullptr);
-        launchThreads(threads, rdo_bc3_workload_runner, &workload);
-        success = workload.m_success;
+        if (bcn == KTX_BCN_COMPRESSION_BC2) {
+            rdo_bc2_or_bc3_workload workload(
+                width, height, packed_img, block_pixels_rgbx.data(), block_pixels_axxx.data(),
+                ert_p, ert_p_a,
+                params.ultra_smooth_block_mse_handling ? block_rgb_mse_scales.data() : nullptr);
+            launchThreads(threads, rdo_bc2_workload_runner, &workload);
+            success = workload.m_success;
+        } else /* KTX_BCN_COMPRESSION_BC3 */ {
+            rdo_bc2_or_bc3_workload workload(
+                width, height, packed_img, block_pixels_rgbx.data(), block_pixels_axxx.data(),
+                ert_p, ert_p_a,
+                params.ultra_smooth_block_mse_handling ? block_rgb_mse_scales.data() : nullptr);
+            launchThreads(threads, rdo_bc3_workload_runner, &workload);
+            success = workload.m_success;
+        }
 
 #if DEBUG_PRINT_STATS
         auto finish = std::chrono::high_resolution_clock::now();
@@ -1173,15 +1242,15 @@ postprocess_rdo_bcn(const uint8_t* unpacked_img, size_t unpacked_img_size, uint8
         std::cout << "total rdo time (s): " << total_rdo_time / 1000.0f << '\n';
         std::cout << "total nbr modified BC1 RGB blocks (%): "
                   << (100.0f * workload.m_total_modified_rgb) / nBlocksTotal << '\n';
-        std::cout << "total nbr rgb modified BC4 A blocks (%): "
+        std::cout << "total nbr rgb modified Alpha blocks (%): "
                   << (100.0f * workload.m_total_modified_a) / nBlocksTotal << '\n';
         std::cout << "total nbr smooth BC1 RGB blocks (%): "
                   << (100.0f * workload.m_total_smooth_blocks_rgb) / nBlocksTotal << '\n';
-        std::cout << "total nbr smooth BC4 A blocks (%): "
+        std::cout << "total nbr smooth Alpha blocks (%): "
                   << (100.0f * workload.m_total_smooth_blocks_a) / nBlocksTotal << '\n';
         std::cout << "total second matches for BC1 RGB blocks: "
                   << workload.m_total_second_matches_rgb << '\n';
-        std::cout << "total second matches for BC4 A blocks: " << workload.m_total_second_matches_a
+        std::cout << "total second matches for Alpha blocks: " << workload.m_total_second_matches_a
                   << '\n';
 #endif
 
@@ -1451,7 +1520,7 @@ postprocess_rdo_bcn(const uint8_t* unpacked_img, size_t unpacked_img_size, uint8
  *                      Not enough memory to carry out compression.
  * @exception KTX_UNSUPPORTED_FEATURE
  *                      Unsupported or not-yet-supported target BCn format
- *                      (e.g., BC1A, BC2, and BC6HS).
+ *                      (e.g., BC1A and BC6HS).
  * @exception KTX_UNSUPPORTED_FEATURE
  *                      Unsupported supercompression scheme.
  */
@@ -1531,12 +1600,27 @@ ktxTexture2_CompressBCnEx(ktxTexture2* This, ktxBCnParams* params) {
         break;
 
     // bc7enc's BC1 encoder does not support punch-through alpha
-    // BC2 encoder is not yet implemented
     // BC6HS is not supported by Basis Universal's BC6 encoder
     case KTX_BCN_COMPRESSION_BC1A:
-    case KTX_BCN_COMPRESSION_BC2:
     case KTX_BCN_COMPRESSION_BC6HS:
         return KTX_UNSUPPORTED_FEATURE;
+
+    case KTX_BCN_COMPRESSION_BC2:
+        switch (This->vkFormat) {
+        case VK_FORMAT_R8G8B8A8_UNORM:
+            compressedVkFormat = VK_FORMAT_BC2_UNORM_BLOCK;
+            break;
+        case VK_FORMAT_R8G8B8A8_SRGB:
+            compressedVkFormat = VK_FORMAT_BC2_SRGB_BLOCK;
+            break;
+        default:
+            return KTX_INVALID_OPERATION;  // Not a valid decompressed vkformat for BC2
+        }
+        nchannels = BC2_NCHANNELS;
+        blocksize_in_bytes = BC2_BLOCK_SIZE;
+        expected_color_model = khr_df_model_e::KHR_DF_MODEL_BC2;
+        rgbcx::init(rgbcx::bc1_approx_mode::cBC1Ideal);
+        break;
 
     case KTX_BCN_COMPRESSION_BC3:
         switch (This->vkFormat) {

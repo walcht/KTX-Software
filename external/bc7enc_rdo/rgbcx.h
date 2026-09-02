@@ -236,6 +236,12 @@ namespace rgbcx
 	const uint32_t MIN_LEVEL = 0, MAX_LEVEL = 18;
 	void encode_bc1(uint32_t level, void* pDst, const uint8_t* pPixels, bool allow_3color, bool use_transparent_texels_for_black, const uint8_t* pForce_selectors = nullptr);
 
+  // Encodes a 4x4 block of RGBA pixels to BC2 format.
+  // BC2 almost always results in worse quality than BC3 format due to the way
+  // BC2 encodes the alpha channel. BC2 encodes each pixel's alpha channel
+  // into 4 bits while BC3 uses two alpha endpoints and interpolation indices.
+  void encode_bc2(uint32_t level, void* pDst, const uint8_t* pPixels);
+
 	// Low-level interface for BC1 encoding.
 	// Always returns a 4 color block, unless cEncodeBC1Use3ColorBlocksForBlackPixels or cEncodeBC1Use3ColorBlock flags are specified. 
 	// total_orderings_to_try controls the perf. vs. quality tradeoff on 4-color blocks when the cEncodeBC1UseLikelyTotalOrderings flag is used. It must range between [MIN_TOTAL_ORDERINGS, MAX_TOTAL_ORDERINGS4].
@@ -274,7 +280,8 @@ namespace rgbcx
 	bool unpack_bc1(const void* pBlock_bits, void* pPixels, bool set_alpha = true, bc1_approx_mode mode = bc1_approx_mode::cBC1Ideal);
 	
 	void unpack_bc4(const void* pBlock_bits, uint8_t* pPixels, uint32_t stride = 4);
-	
+
+	void unpack_sharp_alpha(const void* pBlock_bits, uint8_t* pPixels, uint32_t stride);
   bool unpack_bc2(const void* pBlock_bits, void* pPixels, bc1_approx_mode mode = bc1_approx_mode::cBC1Ideal);
 
 	// Returns true if the block uses 3 color punchthrough alpha mode.
