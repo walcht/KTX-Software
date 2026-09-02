@@ -41,8 +41,6 @@ class KtxBCnParams:
     Default is 1.
     """
 
-    normal_map: bool = False
-
     bcn_rdo_quality_scalar: float = 1.0
     """
     RDO quality scalar (lambda). Controls rate vs. distortion tradeoff. Lower

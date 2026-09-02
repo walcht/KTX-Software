@@ -59,7 +59,7 @@ unpack_block_bc3(const void* pBlock, void* pPixels, rgbcx::bc1_approx_mode bc1_a
 
 /**
  * @ingroup reader
- * @brief Decodes a ktx2 texture object, if it is BCn encoded.
+ * @brief Decode a ktx2 texture object, if it is BCn encoded.
  *
  * All BCn formats are supported (BC1, BC2, BC3, BC4, BC5, BC6HU, BC6HS, or
  * BC7).

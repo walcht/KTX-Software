@@ -1418,17 +1418,17 @@ typedef struct ktxAstcParams {
  */
 typedef enum ktx_pack_bcn_quality_levels_e {
     KTX_PACK_BCN_QUALITY_LEVEL_FASTEST    = 0U,
-        /*!< Fastest compression. For BC1/BC3, this maps to 0. */
+        /*!< Fastest compression. For BC1/BC2/BC3, this maps to 0. */
     KTX_PACK_BCN_QUALITY_LEVEL_FASTER     = 1U,
-        /*!< Faster compression. For BC1/BC3, this maps to 2. */
+        /*!< Faster compression. For BC1/BC2/BC3, this maps to 2. */
     KTX_PACK_BCN_QUALITY_LEVEL_FAST       = 2U,
-        /*!< Fast compression. For BC1/BC3, this maps to 5. */
+        /*!< Fast compression. For BC1/BC2/BC3, this maps to 5. */
     KTX_PACK_BCN_QUALITY_LEVEL_MEDIUM     = 3U,
-        /*!< Medium compression. For BC1/BC3, this maps to 10. */
+        /*!< Medium compression. For BC1/BC2/BC3, this maps to 10. */
     KTX_PACK_BCN_QUALITY_LEVEL_THOROUGH   = 4U,
-        /*!< Thorough compression. For BC1/BC3, this maps to 15. */
+        /*!< Thorough compression. For BC1/BC2/BC3, this maps to 15. */
     KTX_PACK_BCN_QUALITY_LEVEL_EXHAUSTIVE = 5U,
-        /*!< Exhaustive compression. For BC1/BC3, this maps to 19. */
+        /*!< Exhaustive compression. For BC1/BC2/BC3, this maps to 19. */
     KTX_PACK_BCN_QUALITY_LEVEL_MAX = KTX_PACK_BCN_QUALITY_LEVEL_EXHAUSTIVE,
 } ktx_pack_bcn_quality_levels_e;
 typedef ktx_uint32_t ktx_pack_bcn_quality_levels;
@@ -1483,20 +1483,18 @@ typedef ktx_uint32_t ktx_bcn_compression;
  *        ktxTexture2_CompressBCnEx.
  *
  * If you only want default values at a minimum you must initialize the
- * structure as follows (you have to explicitly the target BCn compression via
- * the @e bcn field):
+ * structure as follows (you have to explicitly set the target BCn compression
+ * via the @e bcn field):
  * @code
  *  ktxBCnParams params = {0};
  *  params.structSize = sizeof(params);
  *  params.bcn = KTX_BCN_COMPRESSION_BCX;
- *  // If targeting BC1, BC3, or BC7:
+ *  // If targeting BC1, BC2, BC3, or BC7:
  *  params.bcnCompressionQuality = KTX_PACK_BCN_QUALITY_LEVEL_XXXX;
  * @endcode
  *
- * When targeting BC1 or BC3, @e bc1CompressionQuality has to be explicitly set
- * because 0 is a valid value.
- * When targeting BC7, @e bc7CompressionQuality has to be explicitly set because
- * 0 is a valid value.
+ * When targeting BC1, BC2, BC3, or BC7 @e bcnCompressionQuality has to be
+ * explicitly set because 0 is a valid value.
  */
 typedef struct ktxBCnParams {
     ktx_uint32_t structSize;
@@ -1505,9 +1503,7 @@ typedef struct ktxBCnParams {
          */
 
     ktx_uint32_t threadCount;
-        /*!< Number of threads used for compression (only encoding part, not
-           RDO). Default is 1.
-         */
+        /*!< Number of threads used for compression and RDO. Default is 1. */
 
     ktx_bcn_compression bcn;
         /*!< BCn format to compress the uncompressed images to. Only options
@@ -1520,9 +1516,6 @@ typedef struct ktxBCnParams {
            BC7, because it very strongly separates how RGB is encoded from the
            alpha channel, in a predictable way.
          */
-
-    ktx_bool_t normalMap;
-        /*!< */
 
     ktx_pack_bcn_quality_levels bcnCompressionQuality;
         /*!< BC1 (consequently BC2 and BC3) and BC7 compression quality.

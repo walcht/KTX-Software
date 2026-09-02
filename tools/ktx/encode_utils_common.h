@@ -138,6 +138,6 @@ constexpr void fillOptionsCodecAstc(Options &options) {
 
 template <typename Options>
 constexpr void fillOptionsCodecBCn(Options &options) {
-    fillOptionsCodec<decltype(options), ktxBCnParams>(options);
+    options.ktxBCnParams::threadCount = options.OptionsEncodeCommon::threadCount;
 }
 } // namespace ktx

@@ -162,6 +162,87 @@ public class KtxTexture2 extends KtxTexture {
 	public native int compressAstc(int quality);
 
 	/**
+	 * Encode and compress a ktx texture with uncompressed images to BCn.<br>
+	 * <br>
+   * Currently, only BC1, BC3, BC4, BC5, BC6HU, and BC7 target formats are
+   * supported. Punch-through alpha for BC1 is not supported.
+   * <br>
+   * The images are encoded to specified BCn block-compressed format. The
+   * encoded images replace the original images and the texture's fields
+   * including the DFD are modified to reflect the new state.
+   * <br>
+   * Such textures can be directly uploaded to a BCn-supporting GPU via a
+   * graphics API.
+   * <br>
+   * Encoding non-multiple-of-4 texture dimensions is supported. Block
+   * pixels/texels that are out of the texture's dimensions are simply filled
+   * via a clamp-to-edge strategy. This strategy is easier for the encoder to
+   * handle since no abrupt changes are introduced in image boundaries.
+   * <br>
+	 * The images are encoded to BCn block-compressed format. The encoded
+	 * images replace the original images and the texture's fields including
+	 * the DFD are modified to reflect the new state.<br>
+	 * <br>
+	 *
+	 * @param params The {@link KtxBCnParams}
+	 * @return A {@link KtxErrorCode} constant:<br>
+	 * {@link KtxErrorCode#SUCCESS} on success<br>
+	 * {@link KtxErrorCode#INVALID_VALUE} incompatible {@param params}.<br>
+	 * {@link KtxErrorCode#FILE_DATA_ERROR} The texture's supercompression scheme is invalid.<br>
+	 * {@link KtxErrorCode#INVALID_OPERATION} The texture's images are already in a block compressed format.<br>
+	 * {@link KtxErrorCode#INVALID_OPERATION} The texture image's format is a packed format (e.g., RGB565).<br>
+	 * {@link KtxErrorCode#INVALID_OPERATION} The texture's images are not 2D. Only 2D images can be block compressed with BCn.<br>
+	 * {@link KtxErrorCode#INVALID_OPERATION} The texture does not contain any data.<br>
+	 * {@link KtxErrorCode#INVALID_OPERATION} VkFormat of this texture is not supported or does not match that of the set BCn color model.<br>
+	 * {@link KtxErrorCode#INVALID_OPERATION} generateMipmaps is set.<br>
+	 * {@link KtxErrorCode#OUT_OF_MEMORY} Not enough memory to carry out compression.<br>
+	 * {@link KtxErrorCode#UNSUPPORTED_FEATURE} Unsupported or not-yet-supported target BCn format (e.g., BC1A and BC6HS).<br>
+	 * {@link KtxErrorCode#UNSUPPORTED_FEATURE} Unsupported supercompression scheme. 
+	 */
+	public native int compressBCnEx(KtxBCnParams params);
+
+	/**
+   * Decode a ktx2 texture object, if it is BCn encoded.
+	 * <br>
+   * Currently, only BC1, BC3, BC4, BC5, BC6HU, and BC7 target formats are
+   * supported. Punch-through alpha for BC1 is not supported.
+   * <br>
+   * All BCn formats are supported (BC1, BC2, BC3, BC4, BC5, BC6HU, BC6HS, or
+   * BC7).
+   * <br>
+   * The decompressed format is determined from corresponding BCn format and the
+   * transfer function in DFD.
+   * <br>
+   * UNORM vs. SRGB is determined depending on the original transfer function
+   * value in the DFD.
+   * <br>
+   * UNORM vs. SNORM is determined based on the original VkFormat.
+   * <br>
+   * The images are decompressed from BCn block-compressed format. The
+   * decompressed images replace the original images and the texture's fields
+   * including the DFD are modified to reflect the new state.
+   * <br>
+   * Such textures can be directly uploaded to the GPU as raw (decompressed)
+   * formats.
+   * <br>
+   * Decoding into non-multiple-of-4 texture dimensions is also supported
+   * (decoded blocks that fall out of the texture's dimensions are simply
+   * discarded).
+	 *
+	 * @return A {@link KtxErrorCode} constant:<br>
+	 * {@link KtxErrorCode#SUCCESS} on success<br>
+	 * {@link KtxErrorCode#FILE_DATA_ERROR} The texture's supercompression scheme is invalid.<br>
+	 * {@link KtxErrorCode#FILE_DATA_ERROR} VkFormat does not correspond to the set BCn color model.<br>
+	 * {@link KtxErrorCode#INVALID_OPERATION} The texture is not compressed.<br>
+	 * {@link KtxErrorCode#INVALID_OPERATION} The texture's images are not in BCn format.<br>
+	 * {@link KtxErrorCode#INVALID_OPERATION} The texture does not contain any data.<br>
+	 * {@link KtxErrorCode#DECOMPRESS_FAILURE} Decoder/Unpacker returned an error exit code or a non-success return flag. Only occurs for BC1, BC2, BC3, and BC7 (BC2 and BC3 are based on BC1).<br>
+	 * {@link KtxErrorCode#OUT_OF_MEMORY} Not enough memory to carry out decoding.<br>
+	 * {@link KtxErrorCode#UNSUPPORTED_FEATURE} Unsupported supercompression scheme. 
+	 */
+	public native int decodeBCn();
+
+	/**
 	 * Encode and possibly Supercompress a KTX2 texture with uncompressed images.<br>
 	 * <br>
 	 * The images are either encoded to ETC1S block-compressed format and supercompressed

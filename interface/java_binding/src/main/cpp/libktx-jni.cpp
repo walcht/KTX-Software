@@ -66,7 +66,6 @@ jfieldID KtxAstcParams_inputSwizzle_field; // "[C"
 
 jfieldID KtxBCnParams_threadCount_field; // "I"
 jfieldID KtxBCnParams_bcn_field; // "I"
-jfieldID KtxBCnParams_normalMap_field; // "Z"
 jfieldID KtxBCnParams_bcnCompressionQuality_field; // "I"
 jfieldID KtxBCnParams_bcnRDOQualityScalar_field; // "F"
 jfieldID KtxBCnParams_bcnRDODictSize_field; // "I"
@@ -186,7 +185,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *jvm, void *)
     if (!initClass(env, cls, "org/khronos/ktx/KtxBCnParams")) return JNI_ERR;
     if (!initField(env, cls, KtxBCnParams_threadCount_field, "threadCount", "I")) return JNI_ERR;
     if (!initField(env, cls, KtxBCnParams_bcn_field, "bcn", "I")) return JNI_ERR;
-    if (!initField(env, cls, KtxBCnParams_normalMap_field, "normalMap", "Z")) return JNI_ERR;
     if (!initField(env, cls, KtxBCnParams_bcnCompressionQuality_field, "bcnCompressionQuality", "I")) return JNI_ERR;
     if (!initField(env, cls, KtxBCnParams_bcnRDOQualityScalar_field, "bcnRDOQualityScalar", "F")) return JNI_ERR;
     if (!initField(env, cls, KtxBCnParams_bcnRDODictSize_field, "bcnRDODictSize", "I")) return JNI_ERR;
@@ -339,7 +337,6 @@ bool copy_ktx_bcn_params(JNIEnv *env, jobject params, ktxBCnParams &out)
     out.structSize = sizeof(ktxBCnParams);
     out.threadCount = env->GetIntField(params, KtxBCnParams_threadCount_field);
     out.bcn = env->GetIntField(params, KtxBCnParams_bcn_field);
-    out.normalMap = env->GetBooleanField(params, KtxBCnParams_normalMap_field);
     out.bcnCompressionQuality = env->GetIntField(params, KtxBCnParams_bcnCompressionQuality_field);
     out.bcnRDOQualityScalar = env->GetFloatField(params, KtxBCnParams_bcnRDOQualityScalar_field);
     out.bcnRDODictSize = env->GetIntField(params, KtxBCnParams_bcnRDODictSize_field);

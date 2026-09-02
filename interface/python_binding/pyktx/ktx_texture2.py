@@ -141,7 +141,6 @@ class KtxTexture2(KtxTexture):
         error = lib.PY_ktxTexture2_CompressBCnEx(self._ptr,
                                                  params.thread_count,
                                                  params.bcn,
-                                                 params.normal_map,
                                                  params.bcn_compression_quality,
                                                  params.bcn_rdo_quality_scalar,
                                                  params.bcn_rdo_dict_size,

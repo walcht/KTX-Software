@@ -168,7 +168,6 @@ ffibuilder.cdef(
     int PY_ktxTexture2_CompressBCnEx(void *texture,
                                      uint32_t threadCount,
                                      uint32_t bcn,
-                                     bool normalMap,
                                      uint32_t bcnCompressionQuality,
                                      float bcnRDOQualityScalar,
                                      uint32_t bcnRDODictSize,

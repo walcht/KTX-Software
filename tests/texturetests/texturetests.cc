@@ -26,7 +26,6 @@
 // This should be included first to avoid/suppress issues on Windows
 #include "platform_utils.h"
 #include <version>
-#include <barrier>
 #include <filesystem>
 #if defined(__cpp_lib_format)
   #include <format>
@@ -38,7 +37,6 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <thread>
 #include <sys/stat.h>
 #include <limits.h>
 #include <stdint.h>
@@ -3581,7 +3579,6 @@ class ktxTexture2BCnEncodeDecodeTestBase
         params.structSize = sizeof(params);
         params.threadCount = 1;
         params.bcn = bcn;
-        params.normalMap = false;
         params.bcnCompressionQuality = KTX_PACK_BCN_QUALITY_LEVEL_MEDIUM;
         params.bcnRDO = rdo;
         result = ktxTexture2_CompressBCnEx(texture, &params);

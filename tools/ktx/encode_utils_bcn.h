@@ -147,7 +147,6 @@ struct OptionsEncodeBCn : public ktxBCnParams {
         structSize = sizeof(ktxBCnParams);
         threadCount = std::max<ktx_uint32_t>(1u, std::thread::hardware_concurrency());
         /* bcn is set depending in ktx create/encode commands not here */
-        normalMap = false;
         bcnCompressionQuality = KTX_PACK_BCN_QUALITY_LEVEL_THOROUGH;
         bcnRDO = false;
         bcnRDOQualityScalar = 1.0f;
