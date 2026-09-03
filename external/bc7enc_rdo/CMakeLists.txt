@@ -21,7 +21,9 @@ if (NOT MSVC)
   target_compile_options(rgbcx PRIVATE
     -fno-strict-aliasing
     # Without this, GCC 15.2.0 outputs "error: writing 1 byte into a region of size 0" This is a known GCC false positive.
-    -Wno-stringop-overflow)
+    -Wno-stringop-overflow
+    -Wno-unknown-warning-option  # so that clang shuts up about unknown warning flags
+  )
   target_compile_options(ert PRIVATE -fno-strict-aliasing)
 endif()
 

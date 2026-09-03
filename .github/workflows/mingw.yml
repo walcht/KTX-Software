@@ -87,7 +87,7 @@ jobs:
       id: teststep
       run: ctest --output-on-failure --test-dir build -C Release -j $(nproc)
     - name: Upload generated CTS output files if CTS tests fail
-      if: failure() && matrix.options.tools_cts == 'ON'  && steps.teststep.outcome == 'failure'
+      if: failure() && steps.teststep.outcome == 'failure'
       uses: actions/upload-artifact@v7
       with:
         name: cts_failure_artifacts_${{ github.sha }}
