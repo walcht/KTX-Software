@@ -18,7 +18,10 @@ target_compile_features(ert PUBLIC cxx_std_17)
 # original bc7enc_rdo disables strict aliasing (see https://github.com/richgel999/bc7enc_rdo/blob/master/CMakeLists.txt)
 # basisu also emphasises on compiling with '-fno-strict-aliasing'
 if (NOT MSVC)
-  target_compile_options(rgbcx PRIVATE -fno-strict-aliasing)
+  target_compile_options(rgbcx PRIVATE
+    -fno-strict-aliasing
+    # Without this, GCC 15.2.0 outputs "error: writing 1 byte into a region of size 0" This is a known GCC false positive.
+    -Wno-stringop-overflow)
   target_compile_options(ert PRIVATE -fno-strict-aliasing)
 endif()
 
