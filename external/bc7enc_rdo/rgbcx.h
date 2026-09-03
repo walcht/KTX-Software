@@ -10,8 +10,6 @@
 // https://github.com/castano/icbc/blob/master/icbc.h
 // http://www.humus.name/index.php?page=3D&ID=79
 //
-// This is a single header file library. Be sure to "#define RGBCX_IMPLEMENTATION" in one .cpp file somewhere.
-//
 // Instructions:
 //
 // The library MUST be initialized by calling this function at least once before using any encoder or decoder functions:
