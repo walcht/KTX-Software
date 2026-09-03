@@ -16,19 +16,19 @@ package org.khronos.ktx;
  *  // You have to set the target BCn format:
  *  params.bcn = KtxBCnCompression.BCX;
  *  // And if targeting BC1, BC2, BC3, or BC7, you have to set quality level:
- *  params.bcnCompressionQuality = KtxPackBCnQualityLevel.XXXX;
+ *  params.bcnCompressionQuality = KtxPackBCnQualityLevels.XXXX;
  * </code>
  */
 public class KtxBCnParams {
 
-	/**
+  /**
    * Number of threads used for compression and RDO. Default is 1.
-	 */
-	private int threadCount;
+   */
+  private int threadCount;
 
-	/**
-	 * BCn format to compress the uncompressed images to. Given as a
-	 * {@link KtxBCnCompression}. Only options related to the provided target BCn
+  /**
+   * BCn format to compress the uncompressed images to. Given as a
+   * {@link KtxBCnCompression}. Only options related to the provided target BCn
    * format are used.
    *
    * Since BC7 encoding is performed using basisu's analytical encoder which
@@ -37,10 +37,10 @@ public class KtxBCnParams {
    * need to use BC1 now. BC3 still has an advantage vs. BC7, because it very
    * strongly separates how RGB is encoded from the alpha channel, in a
    * predictable way.
-	 */
+   */
   private int bcn;
 
-	/**
+  /**
    * BC1 (consequently BC2 and BC3) and BC7 compression quality. Supplied as a
    * value of {@link KtxPackBCnQualityLevels}. Lower values give faster
    * compression speed but potentially lower quality. Higher values give slower
@@ -49,10 +49,10 @@ public class KtxBCnParams {
    *
    * For BC1, BC2, and BC3, this maps to the range [0, 19].
    * For BC7, this maps to an OR'ed set of low-level flags.
-	 */
+   */
   private int bcnCompressionQuality;
 
-	/**
+  /**
    * RDO quality scalar (lambda). Controls rate vs. distortion tradeoff. Lower
    * values yield higher quality/larger LZ compressed files, higher values yield
    * lower quality/smaller LZ compressed files. A good range to try is [0.25,8].
@@ -65,18 +65,18 @@ public class KtxBCnParams {
    * distortion.
    *
    * Currently, HDR formats (i.e., BC6HU/BC6HS) are not supported.
-	 */
+   */
   private float bcnRDOQualityScalar;
 
-	/**
+  /**
    * The number of bytes up to which the encoder can look back to from each
    * block to find matches. The larger this value, the slower the encoder but
    * the higher the quality per LZ compressed bit. Range is [64,65536].
    * Default is 4096.
-	 */
+   */
   private int bcnRDODictSize;
 
-	/**
+  /**
    * RDO max MSE scaling factor for blocks considered to be smooth/flat. A value
    * of 1.0 means no smooth block error scaling which may cause very noticeable
    * artifacts for smooth/flat blocks (e.g., kodim23 test image).
@@ -101,10 +101,10 @@ public class KtxBCnParams {
    * difficult texture the currently formulas/settings doesn't handle so well,
    * try encoding kodim03 at lambdas 1-3). Smooth block handling is tuned so
    * lambdas at or near 1 look OK on textures with smooth gradients, skies, etc.
-	 */
+   */
   private float bcnRDOMaxSmoothBlockErrorScale;
 
-	/**
+  /**
    * RDO max smooth/flat block standard deviation. If the std dev. of a block
    * exceeds this value, then it won't be considered as a smooth block (i.e.,
    * the smooth block MSE scale factor will be set to 1 for this block). The
@@ -112,17 +112,17 @@ public class KtxBCnParams {
    * smooth block MSE scale factor approaches @p bcnRDOMaxSmoothBlockErrorScale.
    * Range is [.01,65536.0]. Larger values expand the range of blocks considered
    * smooth. Default is 18.0.
-	 */
+   */
   private float bcnRDOMaxSmoothBlockStdDev;
 
-	/**
+  /**
    * How much the RMS error of a block is allowed to increase before a trial is
    * rejected. 1.0=no increase allowed, 1.05=5% increase allowed, etc. Range is
    * [1.001, 100.0]. Default is 10.0.
-	 */
+   */
   private float bcnRDOMaxAllowedRMSIncreaseRatio;
 
-	/**
+  /**
    * Enable Rate Distortion Optimization (RDO) post-processing step on
    * BCn-encoded blocks to reduce entropy with Deflate/LZMA/LZHAM optimizations.
    * This is primarily used to reduce size on disk by applying a further
@@ -130,10 +130,10 @@ public class KtxBCnParams {
    * if this is set. Setting this might result in significantly slower encoding
    * time at the benefit of potentially significantly lower bit rate (i.e.,
    * number of bits per encoded texel). Default is false.
-	 */
+   */
   private boolean bcnRDO;
 
-	/**
+  /**
    * Disable the detection of extremely smooth blocks and encoding them with a
    * significantly higher MSE scale factor. When disabled, a per-block mask
    * image is computed, filtered, then an array of per-block MSE scale factors
@@ -144,14 +144,14 @@ public class KtxBCnParams {
    *
    * This only applies to BC1, BC3, and BC7's RGB blocks (alpha is ignored). For
    * other formats, this is silently ignored.
-	 */
+   */
   private boolean bcnRDONoUltrasmoothBlockHandling;
 
-	/**
+  /**
    * If disabled, inject up to 2 matches into each block as opposed to just one
    * match. Enabling this results in faster but but noticeably lower
    * compression. Default is false.
-	 */
+   */
   private boolean bcnRDOTryOneMatch;
 
   /**
@@ -166,58 +166,58 @@ public class KtxBCnParams {
    */
   private boolean bcnRDONoMultithreading;
 
-	/**
+  /**
    * Get number of threads used for compression and RDO.
-	 *
-	 * @return The number of threads
-	 */
+   *
+   * @return The number of threads
+   */
   public int getThreadCount() {
     return threadCount;
   }
 
-	/**
+  /**
    * Set number of threads used for compression and RDO. Default is 1.
-	 *
-	 * @param threadCount The number of threads
-	 */
+   *
+   * @param threadCount The number of threads
+   */
   public void setThreadCount(int threadCount) {
     this.threadCount = threadCount;
   }
 
-	/**
+  /**
    * Get BCn compression format to compress the uncompressed images to.
-	 *
-	 * @return BCn compression format as a value of {@link KtxBCnCompression}
-	 */
+   *
+   * @return BCn compression format as a value of {@link KtxBCnCompression}
+   */
   public int getBCn() {
     return bcn;
   }
 
-	/**
+  /**
    * Set BCn compression format to compress the uncompressed images to.
-	 *
-	 * @param bcn BCn compression format as a value of {@link KtxBCnCompression}
-	 */
+   *
+   * @param bcn BCn compression format as a value of {@link KtxBCnCompression}
+   */
   public void setBCn(int bcn) {
     this.bcn = bcn;
   }
 
   /**
    * Get BC1 (consequently BC2 and BC3) and BC7 compression quality.
-	 *
-	 * @return BC1/BC2/BC3 and BC7 compression quality level as a value of
+   *
+   * @return BC1/BC2/BC3 and BC7 compression quality level as a value of
    * {@link KtxPackBCnQualityLevels}.
    */
   public int getBCnCompressionQuality() {
     return bcnCompressionQuality;
   }
 
-	/**
+  /**
    * Set BC1 (consequently BC2 and BC3) and BC7 compression quality.
-	 *
-	 * @param bcnCompressionQuality BC1/BC2/BC3 and BC7 compression quality (can
+   *
+   * @param bcnCompressionQuality BC1/BC2/BC3 and BC7 compression quality (can
    * be supplied as a value of {@link KtxBCnCompression})
-	 */
+   */
   public void setBCnCompressionQuality(int bcnCompressionQuality) {
     this.bcnCompressionQuality = bcnCompressionQuality;
   }
@@ -261,7 +261,7 @@ public class KtxBCnParams {
   /**
    * Get RDO max MSE scaling factor for blocks considered to be smooth/flat.
    *
-   * @return
+   * @return RDO mas MSE scaling factor
    */
   public float getBCnRDOMaxSmoothBlockErrorScale() {
     return bcnRDOMaxSmoothBlockErrorScale;

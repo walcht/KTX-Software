@@ -11,7 +11,7 @@ package org.khronos.ktx;
  * These constants can be passed to
  * {@link KtxBCnParams#setBCnCompressionQuality(int)}.
  */
-public class KtxPackBCnQualityLevel {
+public class KtxPackBCnQualityLevels {
 
 	/**
 	 * Fastest compression. For BC1/BC2/BC3, this maps to 0.
