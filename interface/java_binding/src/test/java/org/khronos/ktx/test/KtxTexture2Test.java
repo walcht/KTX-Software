@@ -22,9 +22,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.khronos.ktx.KtxBasisCodec;
 import org.khronos.ktx.KtxBasisParams;
+import org.khronos.ktx.KtxAstcParams;
+import org.khronos.ktx.KtxPackAstcQualityLevel;
+import org.khronos.ktx.KtxPackAstcBlockDimension;
 import org.khronos.ktx.KtxBCnParams;
 import org.khronos.ktx.KtxBCnCompression;
-import org.khronos.ktx.KtxPackBCnQualityLevel; 
+import org.khronos.ktx.KtxPackBCnQualityLevels; 
 import org.khronos.ktx.KtxTextureCreateStorage;
 import org.khronos.ktx.KtxErrorCode;
 import org.khronos.ktx.KtxException;
@@ -364,12 +367,82 @@ public class KtxTexture2Test {
 
         KtxBCnParams params = new KtxBCnParams();
         params.setBCn(KtxBCnCompression.BC7);
-        params.setBCnCompressionQuality(KtxPackBCnQualityLevel.THOROUGH);
+        params.setBCnCompressionQuality(KtxPackBCnQualityLevels.THOROUGH);
         params.setBCnRDO(true);
         assertEquals(KtxErrorCode.SUCCESS, texture.compressBCnEx(params));
 
         assertEquals(true, texture.isCompressed());
         assertEquals(VkFormat.VK_FORMAT_BC7_SRGB_BLOCK, texture.getVkFormat());
+
+        texture.destroy();
+    }
+
+    @Test
+    public void testCompressAstcEx() {
+        Path testKtxFile = Paths.get("")
+                .resolve("../../tests/resources/ktx2/r8g8b8a8_srgb_array_7_mip.ktx2")
+                .toAbsolutePath()
+                .normalize();
+
+        KtxTexture2 texture = KtxTexture2.createFromNamedFile(testKtxFile.toString(),
+                KtxTextureCreateFlagBits.LOAD_IMAGE_DATA_BIT);
+
+        assertNotNull(texture);
+        assertEquals(false, texture.isCompressed());
+        assertEquals(KtxSupercmpScheme.NONE, texture.getSupercompressionScheme());
+
+        KtxAstcParams params = new KtxAstcParams();
+        params.setBlockDimension(KtxPackAstcBlockDimension.D4x4);
+        params.setQualityLevel(KtxPackAstcQualityLevel.THOROUGH);
+        assertEquals(KtxErrorCode.SUCCESS, texture.compressAstcEx(params));
+
+        assertEquals(true, texture.isCompressed());
+        assertEquals(VkFormat.VK_FORMAT_ASTC_4x4_SRGB_BLOCK, texture.getVkFormat());
+
+        texture.destroy();
+    }
+
+    @Test
+    public void testCompressAstc() {
+        Path testKtxFile = Paths.get("")
+                .resolve("../../tests/resources/ktx2/r8g8b8a8_srgb_array_7_mip.ktx2")
+                .toAbsolutePath()
+                .normalize();
+
+        KtxTexture2 texture = KtxTexture2.createFromNamedFile(testKtxFile.toString(),
+                KtxTextureCreateFlagBits.LOAD_IMAGE_DATA_BIT);
+
+        assertNotNull(texture);
+        assertEquals(false, texture.isCompressed());
+        assertEquals(KtxSupercmpScheme.NONE, texture.getSupercompressionScheme());
+
+        assertEquals(KtxErrorCode.SUCCESS, texture.compressAstc(50));
+
+        assertEquals(true, texture.isCompressed());
+        assertEquals(VkFormat.VK_FORMAT_ASTC_6x6_SRGB_BLOCK, texture.getVkFormat());
+
+        texture.destroy();
+    }
+
+    @Test
+    public void testDecodeAstc() {
+        Path testKtxFile = Paths.get("")
+                .resolve("../../tests/resources/ktx2/astc_8x8_unorm_array_7.ktx2")
+                .toAbsolutePath()
+                .normalize();
+
+        KtxTexture2 texture = KtxTexture2.createFromNamedFile(testKtxFile.toString(),
+                KtxTextureCreateFlagBits.LOAD_IMAGE_DATA_BIT);
+
+        assertNotNull(texture);
+        assertEquals(true, texture.isCompressed());
+        assertEquals(VkFormat.VK_FORMAT_ASTC_8x8_SFLOAT_BLOCK, texture.getVkFormat());
+
+        assertEquals(KtxErrorCode.SUCCESS, texture.decodeAstc());
+
+        assertEquals(false, texture.isCompressed());
+        assertEquals(VkFormat.VK_FORMAT_R16G16B16A16_SFLOAT, texture.getVkFormat());
+        assertEquals(KtxSupercmpScheme.NONE, texture.getSupercompressionScheme());
 
         texture.destroy();
     }

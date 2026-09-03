@@ -1407,7 +1407,7 @@ postprocess_rdo_bcn(const uint8_t* unpacked_img, size_t unpacked_img_size, uint8
                 compute_block_rgb_mse_scales(unpacked_img, width, height, BC7_NCHANNELS,
                                              ert_p.m_smooth_block_max_mse_scale, ert_p.m_lambda);
 
-        // Source image data need to be laid out as blocks (i.e., 1st row of 1s
+        // Source image data need to be laid out as blocks (i.e., 1st row of 1st
         // block, then 2nd row of 1st block, etc. - Not: 1st row of 1st block
         // then 1st row of 2nd block, etc.). This is what the main RDO function
         // ert::reduce_entropy expects.

@@ -158,6 +158,18 @@ extern "C" JNIEXPORT jint JNICALL Java_org_khronos_ktx_KtxTexture2_compressAstc(
     return ktxTexture2_CompressAstc(texture, static_cast<uint32_t>(quality));
 }
 
+extern "C" JNIEXPORT jint JNICALL Java_org_khronos_ktx_KtxTexture2_decodeAstc(JNIEnv *env,
+                                                                              jobject thiz)
+{
+    ktxTexture2 *texture = get_ktx2_texture(env, thiz);
+    if (texture == NULL)
+    {
+      ThrowDestroyed(env);
+      return 0;
+    }
+    return ktxTexture2_DecodeAstc(texture);
+}
+
 extern "C" JNIEXPORT jint JNICALL Java_org_khronos_ktx_KtxTexture2_compressBCnEx(JNIEnv *env,
                                                                                 jobject thiz,
                                                                                 jobject jparams)

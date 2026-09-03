@@ -162,6 +162,27 @@ public class KtxTexture2 extends KtxTexture {
   public native int compressAstc(int quality);
 
   /**
+   * Decode a ktx2 texture object, if it is ASTC encoded.
+   * <br>
+   * The decompressed format is calculated from corresponding ASTC format.
+   * There are only 3 possible options currently supported. RGBA8, SRGBA8 and
+   * RGBA32.
+   * <br>
+   * 3D textures are decoded to a multi-slice 3d texture.
+   *
+   * @return A {@link KtxErrorCode} constant:<br>
+   * {@link KtxErrorCode#SUCCESS} on success<br>
+   * {@link KtxErrorCode#FILE_DATA_ERROR} DFD is incorrect: supercompression scheme or sample's channelId do not match ASTC colorModel.<br>
+   * {@link KtxErrorCode#INVALID_OPERATION} The texture's images are not in ASTC format.<br>
+   * {@link KtxErrorCode#INVALID_OPERATION} The texture object does not contain any data.<br>
+   * {@link KtxErrorCode#INVALID_OPERATION} ASTC decoder failed to decompress image. Possibly due to incorrect floating point compilation settings. Should not happen in release package.<br>
+   * {@link KtxErrorCode#OUT_OF_MEMORY} Not enough memory to carry out decoding.<br>
+   * {@link KtxErrorCode#UNSUPPORTED_FEATURE} The texture's images are supercompressed with an unsupported scheme.<br>
+   * {@link KtxErrorCode#UNSUPPORTED_FEATURE} ASTC encoder not compiled with enough capacity for requested block size. Should not happen in release package.
+   */
+  public native int decodeAstc();
+
+  /**
    * Encode and compress a ktx texture with uncompressed images to BCn.<br>
    * <br>
    * Currently, only BC1, BC3, BC4, BC5, BC6HU, and BC7 target formats are

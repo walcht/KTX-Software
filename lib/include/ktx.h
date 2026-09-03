@@ -1503,7 +1503,12 @@ typedef struct ktxBCnParams {
          */
 
     ktx_uint32_t threadCount;
-        /*!< Number of threads used for compression and RDO. Default is 1. */
+        /*!< Number of threads used for compression and RDO. Default is 1.
+
+           This also sets the number of threads to be used when doing RDO unless
+           @p bcnRDONoMultithreading is set in which case RDO is single threaded
+           regardless of the value set here.
+          */
 
     ktx_bcn_compression bcn;
         /*!< BCn format to compress the uncompressed images to. Only options

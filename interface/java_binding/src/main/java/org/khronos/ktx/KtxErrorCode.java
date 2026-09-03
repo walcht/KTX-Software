@@ -187,7 +187,7 @@ public class KtxErrorCode {
    * Return a string corresponding to a KTX error code.
    *
    * @param error The error code for which to return a string
-     * @return The message string.
+   * @return The message string.
    */
   public static native String createString(int error);
 

@@ -13,59 +13,59 @@ package org.khronos.ktx;
  */
 public class KtxPackBCnQualityLevels {
 
-	/**
-	 * Fastest compression. For BC1/BC2/BC3, this maps to 0.
-	 */
-	public static final int FASTEST = 0;
+  /**
+   * Fastest compression. For BC1/BC2/BC3, this maps to 0.
+   */
+  public static final int FASTEST = 0;
 
-	/**
-	 * Faster compression. For BC1/BC2/BC3, this maps to 2.
-	 */
-	public static final int FASTER = 1;
+  /**
+   * Faster compression. For BC1/BC2/BC3, this maps to 2.
+   */
+  public static final int FASTER = 1;
 
-	/**
-	 * Fast compression. For BC1/BC2/BC3, this maps to 5.
-	 */
-	public static final int FAST = 2;
+  /**
+   * Fast compression. For BC1/BC2/BC3, this maps to 5.
+   */
+  public static final int FAST = 2;
 
-	/**
-	 * Medium compression. For BC1/BC2/BC3, this maps to 10.
-	 */
-	public static final int MEDIUM = 3;
+  /**
+   * Medium compression. For BC1/BC2/BC3, this maps to 10.
+   */
+  public static final int MEDIUM = 3;
 
-	/**
-	 * Thorough compression. For BC1/BC2/BC3, this maps to 15.
-	 */
-	public static final int THOROUGH = 4;
+  /**
+   * Thorough compression. For BC1/BC2/BC3, this maps to 15.
+   */
+  public static final int THOROUGH = 4;
 
-	/**
-	 * Exhaustive compression. For BC1/BC2/BC3, this maps to 19.
-	 */
-	public static final int EXHAUSTIVE = 5;
+  /**
+   * Exhaustive compression. For BC1/BC2/BC3, this maps to 19.
+   */
+  public static final int EXHAUSTIVE = 5;
 
-	/**
-	 * Returns a string representation of the given quality level
-	 *
-	 * @param n The quality level
-	 * @return A string representation of the given quality level
-	 */
-	public static String stringFor(int n) {
-		switch (n) {
-		case FASTEST: return "FASTEST";
-		case FASTER: return "FASTER";
-		case FAST: return "FAST";
-		case MEDIUM: return "MEDIUM";
-		case THOROUGH: return "THOROUGH";
-		case EXHAUSTIVE: return "EXHAUSTIVE";
-		}
-		return "[Unknown KtxPackBCnQualityLevel]";
-	}
+  /**
+   * Returns a string representation of the given quality level
+   *
+   * @param n The quality level
+   * @return A string representation of the given quality level
+   */
+  public static String stringFor(int n) {
+    switch (n) {
+    case FASTEST: return "FASTEST";
+    case FASTER: return "FASTER";
+    case FAST: return "FAST";
+    case MEDIUM: return "MEDIUM";
+    case THOROUGH: return "THOROUGH";
+    case EXHAUSTIVE: return "EXHAUSTIVE";
+    }
+    return "[Unknown KtxPackBCnQualityLevel]";
+  }
 
-	/**
-	 * Private constructor to prevent instantiation
-	 */
-	private KtxPackBCnQualityLevel() {
-		// Prevent instantiation
-	}
+  /**
+   * Private constructor to prevent instantiation
+   */
+  private KtxPackBCnQualityLevels() {
+    // Prevent instantiation
+  }
 
 }
