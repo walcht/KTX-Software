@@ -436,12 +436,12 @@ public class KtxTexture2Test {
 
         assertNotNull(texture);
         assertEquals(true, texture.isCompressed());
-        assertEquals(VkFormat.VK_FORMAT_ASTC_8x8_SFLOAT_BLOCK, texture.getVkFormat());
+        assertEquals(VkFormat.VK_FORMAT_ASTC_8x8_UNORM_BLOCK, texture.getVkFormat());
 
         assertEquals(KtxErrorCode.SUCCESS, texture.decodeAstc());
 
         assertEquals(false, texture.isCompressed());
-        assertEquals(VkFormat.VK_FORMAT_R16G16B16A16_SFLOAT, texture.getVkFormat());
+        assertEquals(VkFormat.VK_FORMAT_R8G8B8A8_UNORM, texture.getVkFormat());
         assertEquals(KtxSupercmpScheme.NONE, texture.getSupercompressionScheme());
 
         texture.destroy();
